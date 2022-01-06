@@ -29,23 +29,17 @@ end
 
 
     # Dynamics
-    repulsion::Bool = true
     dot_repulsion::Float64 = 80.0
     wall_repulsion::Float64 = 50.0
     distance::Float64 = 60.0
     rep_inertia::Float64 = 0.9
 
     # Kinematics
+    dimensions::SVector{2, Float64} = SVector([100., 100.])
     vel::Float64 = 10.0 # base velocity
 
-    brownian::Bool = true
-    inertia::Float64 = 0.8
-    spring::Float64 = 0.002
-    sigma_x::Float64 = 1.0
-    sigma_y::Float64 = 1.0
-
-
     # Graphics
+    img_dims::SVector{2, Int64} = SVector([100, 100])
 end
 
 struct RepulsionState <: GMState
@@ -85,7 +79,6 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
     end
 
     RepulsionState(walls, SVector(new_dots))
-    return cg
 end
 
 """Computes the force of A -> B"""
@@ -99,7 +92,9 @@ function force!(f::Vector{Float64}, a::Dot, b::Dot)
     # TODO
 end
 
-function apply_force(d::Dot, f::Vector{Float64})
+function apply_force(d::Dot, f::Vector{Float64})::Dot
+    new_pos, new_vel = foo(dot, f)
+    new_gstate = bar(dot, pos)
 end
 
 include("gen.jl")

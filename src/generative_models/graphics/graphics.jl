@@ -12,5 +12,4 @@ end
 
 include("flow.jl")
 include("masks.jl")
-include("receptive_fields/receptive_fields.jl")
 include("graphics_module.jl")
