@@ -1,86 +1,63 @@
 
-# projects p onto the line defined by a and b
-function _project(p::T, a::T, b::T) where {T <: Vector{Float64}}
-    ap = p .- a
-    ab = b .- a
-    a .+ dot(ap, ab) / dot(ab, ab) * ab
+const two_pi_sqr = 4.0 * pi * pi
+
+# translates coordinate from euclidean to image space
+function translate_area_to_img(x::Float64, y::Float64,
+                               img_width::Int64, img_height::Int64,
+                               area_width::Float64, area_height::Float64)
+
+    x *= img_width/area_width
+    x += img_width/2
+
+    # inverting y
+    y *= -1 * img_height/area_height
+    y += img_height/2
+
+    return x, y
 end
 
-function get_repulsion_from_wall(dm::ISRDynamics, pos::Vector{Float64},
-                                 walls::Vector{Wall})::Vector{Float64}
-
-    # idea is to project the point onto the walls
-    pos_proj = @>> walls map(w -> _project(pos, w.p1, w.p2))
-
-    force = zeros(2)
-    for i = 1:4
-        v = pos - pos_proj[i]
-        absolute_force = dm.wall_repulsion*exp(-(v[1]^2 + v[2]^2)/(dm.distance^2))
-        force .+= absolute_force * v/norm(v)
+function clamp_and_round(v::Float64, c::Int64)::Int64
+    @> v begin
+        clamp(1., c)
+        (@>> round(Int64))
     end
-    return force
 end
 
+"""
+Writes out a dot mask to matrix
+"""
+function exp_dot_mask!(g::Matrix{Float64},
+                       x0::Float64, y0::Float64,
+                       r::Float64,
+                       w::Int64, h::Int64,
+                       outer_f::Float64,
+                       inner_f::Float64,
+                       outer_p::Float64,
+                       inner_p::Float64)
 
-function get_repulsion_object_to_object(dm::ISRDynamics, pos::T,
-                                        other_pos::Vector{T})::T where {T <: Vector{Float64}}
-    force = zeros(2)
-    for j = 1:length(other_pos)
-        v = pos - other_pos[j]
-        absolute_force = dm.dot_repulsion*exp(-(v[1]^2 + v[2]^2)/(dm.distance^2))
-        force .+= absolute_force * v/norm(v)
+    outer_r = r  * outer_f
+    inner_r = r  * inner_f
+
+    # half-life is 1/6 outer - inner
+    hl = 3.0 * ln_hlf / abs(outer_r - inner_r)
+
+    xlow = clamp_and_round(x0 - outer_r, w)
+    xhigh = clamp_and_round(x0 + outer_r, w)
+    ylow = clamp_and_round(y0 - outer_r, h)
+    yhigh = clamp_and_round(y0 + outer_r, h)
+    n = (xhigh - xlow + 1) * (yhigh - ylow + 1)
+    for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
+        k +=1
+        dst = sqrt((i - x0)^2 + (j - y0)^2)
+        (dst > outer_r) && continue
+        # flip i and j in mask
+        g[j, i] = (dst <= inner_r ) ? inner_p : outer_p * exp(hl * dst)
     end
-    return force
+    return nothing
 end
 
-# gets repulsion forces on dots (from other dots and walls)
-function get_repulsion_force_dots(cg::CausalGraph)::Vector{Vector{Float64}}
-    dm = get_dm(cg)
-    dots = get_objects(cg, Dot)
-
-    n = length(dots)
-    rep_forces = fill(zeros(2), n)
-    positions = map(d->d.pos[1:2], dots)
-
-    for i = 1:n
-        dot = dots[i]
-        other_pos = positions[map(j -> i != j, 1:n)]
-
-        dot_applied_force = get_repulsion_object_to_object(dm, dot.pos[1:2], other_pos)
-        wall_applied_force = get_repulsion_from_wall(dm, dot.pos[1:2], get_walls(cg, dm))
-
-        rep_forces[i] = dot_applied_force + wall_applied_force
-    end
-    
-    rep_forces
-end
-
-function isr_repulsion_step(cg::CausalGraph)::Vector{Dot}
-    rep_forces = get_repulsion_force_dots(cg)
-
-    dm = get_dm(cg)
-    dots = get_objects(cg, Dot)
-
-    for i=1:length(dots)
-        vel = dots[i].vel
-        vel *= dm.rep_inertia
-        vel += (1.0-dm.rep_inertia)*(rep_forces[i])
-        if sum(vel) != 0
-            vel *= dm.vel/norm(vel)
-        end
-
-        dots[i] = Dot(pos=dots[i].pos, vel=vel)
-    end
-    
-    return dots
-end
-
-
-
-walls_idx(dm::ISRDynamics) = collect(1:4)
-
-function get_walls(cg::CausalGraph, dm::ISRDynamics)
-    @>> walls_idx(dm) begin
-        map(v -> get_prop(cg, v, :object))
-    end
+# initializes a new dot
+function Dot(gm::RepulsionGM,
+             pos::SVector{2, Float64}, vel::SVector{2, Float64})
+    Dot(gm.dot_radius, pos, vel, spzeros(gm.dimensions))
 end

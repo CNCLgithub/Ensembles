@@ -3,21 +3,6 @@ export get_masks,
         draw_gaussian_dot_mask,
         translate_area_to_img
 
-# translates coordinate from euclidean to image space
-function translate_area_to_img(x::Float64, y::Float64,
-                               img_width::Int64, img_height::Int64,
-                               area_width::Float64, area_height::Float64)
-
-    x *= img_width/area_width
-    x += img_width/2
-
-    # inverting y
-    y *= -1 * img_height/area_height
-    y += img_height/2
-    
-    return x, y
-end
-
 
 # Draws a dot mask, i.e. a BitMatrix
 function draw_dot_mask(pos::Vector{T},
@@ -32,7 +17,6 @@ function draw_dot_mask(pos::Vector{T},
     return mask
 end
 
-const two_pi_sqr = 4.0 * pi * pi
 
 # 2d gaussian function
 function two_dimensional_gaussian(x::Int64, y::Int64, x_0::Float64, y_0::Float64, A::Float64,
@@ -256,9 +240,3 @@ function get_bit_masks(cgs::Vector{CausalGraph},
     return masks
 end
 
-function clamp_and_round(v::Float64, c::Int64)::Int64
-    @> v begin
-        clamp(1., c)
-        (@>> round(Int64))
-    end
-end
