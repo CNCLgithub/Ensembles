@@ -7,7 +7,7 @@ include("generative_models/generative_models.jl")
 
 # interface for defining dgps
 # defines things like datasets
-include("dgp/dgp.jl")
+#include("dgp/dgp.jl")
 
 # TODO: implement me!
 
@@ -15,5 +15,8 @@ include("dgp/dgp.jl")
 
 # include("flows/flows.jl")
 
+function greet()
+	print("Hello there")
+end
 
 end # module
