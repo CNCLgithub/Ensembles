@@ -1,10 +1,8 @@
-export gm_isr_pos
-
 ################################################################################
 # Initial State
 ################################################################################
-@gen static function isr_tracker(gm::RepulsionGM)::Dot
-    xs, ys, radius = tracker_bounds(gm)
+@gen static function rpl_tracker(gm::RepulsionGM)::Dot
+    xs, ys = tracker_bounds(gm)
     x = @trace(uniform(xs[1], xs[2]), :x)
     y = @trace(uniform(ys[1], ys[2]), :y)
 
@@ -14,10 +12,9 @@ export gm_isr_pos
     vx = mag * cos(ang)
     vy = mag * sin(ang)
 
-    # z (depth) drawn at beginning
-    z = @trace(uniform(0, 1), :z)
-
-    return Dot(pos=[x,y,z], vel=[vx, vy], radius=radius)
+    pos = SVector{2, Float64}([x, y])
+    vel = SVector{2, Float64}([vx, vy])
+    return Dot(gm, pos, vel)
 end
 
 
@@ -26,7 +23,7 @@ Samples a random scene
 """
 @gen static function rpl_init(gm::RepulsionGM)::RepulsionState
     gms = fill(gm, gm.n_dots)
-    trackers = @trace(Gen.Map(isr_tracker)(gms), :trackers)
+    trackers = @trace(Gen.Map(rpl_tracker)(gms), :trackers)
     state = RepulsionState(gm, SVector{Dot}(trackers))
     return state
 end
