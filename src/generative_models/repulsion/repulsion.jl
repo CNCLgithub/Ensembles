@@ -49,13 +49,23 @@ struct RepulsionState <: GMState
 end
 
 function RepulsionState(gm::RepulsionGM, objects::SVector{Dot})
-    walls = SVector{4,Wall}# define me
+    #walls = SVector{4,Wall}# define me
+    walls = init_walls(gm)
     RepulsionState(walls, objects)
 end
 
 # function load(::Type{RepulsionGM}, path::String)
 #     RepulsionGM(;read_json(path)...)
 # end
+
+function init_walls(gm::AbstractGMParams)
+   ws = Vector{Wall}(undef, 4)
+   @inbounds for (i, (x,y)) in enumerate(Iterators.product((1,-1), (1, -1)))
+        ws[i] = Wall(x, y, gm)
+    end
+    return SVector{Wall}(ws)
+    
+end
 
 function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
 
@@ -116,8 +126,16 @@ function force!(f::Vector{Float64}, a::Dot, b::Dot, dm::RepulsionGM)
 end
 
 function update_kinematics(gm::Repulsion, d::Dot, f::Vector{Float64})
-    # TODO
-    (new_pos, new_vel)
+    new_vel = d.vel
+    new_vel *= gm.rep_inertia
+    new_vel += (1.0-gm.rep_inertia)*f)
+    if sum(new_vel) != 0
+        new_vel *= gm.vel/norm(vel)
+    end
+
+    new_pos = d.pos
+    return new_pos, new_vel
+    #(new_pos, new_vel)
 end
 
 function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
