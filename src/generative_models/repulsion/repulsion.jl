@@ -18,7 +18,7 @@ struct Dot <: Thing
     vel::SVector{2, Float64}
 
     # Graphics
-    gstate::SMatrix{Float64} # graphics state
+    gstate::SparseMatrixCSC{Float64} # graphics state
 end
 
 
@@ -49,9 +49,21 @@ struct RepulsionState <: GMState
 end
 
 function RepulsionState(gm::RepulsionGM, objects::SVector{Dot})
-    walls = SVector{4,Wall}# define me
+    #walls # define me
+    walls = init_walls(gm)
+
     RepulsionState(walls, objects)
 end
+
+function init_walls(gm::AbstractGMParams)
+   ws = Vector{Wall}(undef, 4)
+   @inbounds for (i, (x,y)) in enumerate(Iterators.product((1,-1), (1, -1)))
+        ws[i] = Wall(x, y, gm)
+    end
+    return SVector{Wall}(ws)
+    
+end
+
 
 # function load(::Type{RepulsionGM}, path::String)
 #     RepulsionGM(;read_json(path)...)
@@ -61,17 +73,20 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
 
     # Dynamics (computing forces)
     # for each dot compute forces
-    @unpack n_dots = gm
+    
     @unpack walls, objects = state
+    n_dots = length(objects)
     new_dots = Vector{Dot}(undef, n_dots)
     @inbounds for i = 1:n_dots
         facc = zeros(2) # force accumalator
         dot = objects[i]
-        for w in state.walls
+        for w in walls
             force!(facc, w, dot)
         end
         # TODO add interaction with other dots
-
+        for j = 1:n_dots
+            i !== j && force!(facc, objects[j], dot)
+        end
         # kinematics: resolve forces to pos vel
         (new_pos, new_vel) = update_kinematics(gm, dot, facc)
         # also do graphical update
@@ -116,8 +131,15 @@ function force!(f::Vector{Float64}, a::Dot, b::Dot, dm::RepulsionGM)
 end
 
 function update_kinematics(gm::Repulsion, d::Dot, f::Vector{Float64})
-    # TODO
-    (new_pos, new_vel)
+    new_vel = d.vel
+    new_vel *= gm.rep_inertia
+    new_vel += (1.0-gm.rep_inertia)*f)
+    if sum(new_vel) != 0
+        new_vel *= gm.vel/norm(vel)
+    end
+
+    new_pos = d.pos
+    return new_pos, new_vel
 end
 
 function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
@@ -136,9 +158,9 @@ function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
     # decay img
     rmul!(dstate, gm.decay_rate)
     # write new pixels
-    exp_dot_mask!(dstate, x, y, scaled_r, gr)
+    exp_dot_mask!(dstate, x, y, scaled_r, gm)
     gstate = sparse(dstate)
-    droptol!(gstate, gr.min_mag)
+    droptol!(gstate, gm.min_mag)
     return gstate
 end
 
