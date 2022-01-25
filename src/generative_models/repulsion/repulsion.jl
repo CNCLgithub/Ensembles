@@ -162,6 +162,8 @@ function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
     gstate = sparse(dstate)
     droptol!(gstate, gm.min_mag)
     return gstate
+
+    
 end
 
 
