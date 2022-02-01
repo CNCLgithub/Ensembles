@@ -2,7 +2,12 @@ module Ensembles
 
 using Gen
 using Lazy
+using Parameters
 using SparseArrays
+using StaticArrays
+using Distributions
+
+include("utils/utils.jl")
 
 # defines generative models that can be used as data generating procedures
 include("generative_models/generative_models.jl")
@@ -17,8 +22,6 @@ include("generative_models/generative_models.jl")
 
 # include("flows/flows.jl")
 
-function greet()
-	print("Hello there")
-end
+@load_generated_functions
 
 end # module

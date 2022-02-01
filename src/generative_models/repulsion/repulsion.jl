@@ -1,3 +1,4 @@
+export RepulsionGM, step
 
 abstract type Thing end
 
@@ -35,27 +36,25 @@ end
     rep_inertia::Float64 = 0.9
 
     # Kinematics
-    dimensions::SVector{2, Float64} = SVector([100., 100.])
+    dimensions::Tuple{Float64, Float64} = (100., 100.)
     vel::Float64 = 10.0 # base velocity
 
-    # Graphics
-    img_dims::SVector{2, Int64} = SVector([100, 100])
-end
 
+    # Graphics
+    img_dims::Tuple{Int64, Int64} = (100, 100)
+end
 struct RepulsionState <: GMState
     walls::SVector{4, Wall}
     objects::SVector{Dot}
-    distances::SMatrix{Float64}
 end
 
-function RepulsionState(gm::RepulsionGM, objects::SVector{Dot})
+function RepulsionState(gm::RepulsionGM, dots)
     #walls # define me
     walls = init_walls(gm)
-
-    RepulsionState(walls, objects)
+    RepulsionState(walls, SVector{Dot}(dots))
 end
 
-function init_walls(gm::AbstractGMParams)
+function init_walls(gm::RepulsionGM)
    ws = Vector{Wall}(undef, 4)
    @inbounds for (i, (x,y)) in enumerate(Iterators.product((1,-1), (1, -1)))
         ws[i] = Wall(x, y, gm)
@@ -100,7 +99,7 @@ end
 normalvec(w::Wall, pos) = w.normal
 
 """Computes the force of A -> B"""
-function force!(f::Vector{Float64}, ::Object, ::Object)
+function force!(f::Vector{Float64}, ::Thing, ::Thing)
     error("Not implemented")
 end
 function force!(f::Vector{Float64}, w::Wall, d::Dot, dm::RepulsionGM)
@@ -130,10 +129,10 @@ function force!(f::Vector{Float64}, a::Dot, b::Dot, dm::RepulsionGM)
     return force
 end
 
-function update_kinematics(gm::Repulsion, d::Dot, f::Vector{Float64})
+function update_kinematics(gm::RepulsionGM, d::Dot, f::Vector{Float64})
     new_vel = d.vel
     new_vel *= gm.rep_inertia
-    new_vel += (1.0-gm.rep_inertia)*f)
+    new_vel += (1.0-gm.rep_inertia)*f
     if sum(new_vel) != 0
         new_vel *= gm.vel/norm(vel)
     end
@@ -142,7 +141,7 @@ function update_kinematics(gm::Repulsion, d::Dot, f::Vector{Float64})
     return new_pos, new_vel
 end
 
-function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
+function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
 
     @unpack area_width, area_height = gm
     @unpack img_width, img_height = gm
