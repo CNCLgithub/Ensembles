@@ -141,7 +141,7 @@ function update_kinematics(gm::RepulsionGM, d::Dot, f::Vector{Float64})
     return new_pos, new_vel
 end
 
-function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
+function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
 
     @unpack area_width, area_height = gm
     @unpack img_width, img_height = gm
@@ -151,18 +151,22 @@ function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
                                  img_height, img_width,
                                  area_width, area_height)
     scaled_r = d.radius/area_width*img_width # assuming square
+    decayed = d.gstate * gm.decay_rate
+    droptol!(gstate, gm.min_mag)
+    # overlay new render onto memory
+    new_mask = exp_dot_mask(x, y, scaled_r, gm)
+    memory = max.(new_mask, decayed)
 
     # first "copy" over the previous state as a dense array
     dstate = Array(d.gstate)
     # decay img
     rmul!(dstate, gm.decay_rate)
     # write new pixels
-    exp_dot_mask!(dstate, x, y, scaled_r, gm)
+    exp_dot_mask(dstate, x, y, scaled_r, gm)
     gstate = sparse(dstate)
     droptol!(gstate, gm.min_mag)
     return gstate
 
-    
 end
 
 
