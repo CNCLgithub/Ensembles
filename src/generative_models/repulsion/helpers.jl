@@ -26,7 +26,7 @@ end
 """
 Writes out a dot mask to matrix
 """
-function exp_dot_mask!(g::Matrix{Float64},
+function exp_dot_mask!(
                        x0::Float64, y0::Float64,
                        r::Float64,
                        w::Int64, h::Int64,
@@ -46,14 +46,21 @@ function exp_dot_mask!(g::Matrix{Float64},
     ylow = clamp_and_round(y0 - outer_r, h)
     yhigh = clamp_and_round(y0 + outer_r, h)
     n = (xhigh - xlow + 1) * (yhigh - ylow + 1)
-    for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
+    Is = zeros(Int64, n)
+    Js = zeros(Int64, n)
+    Vs = zeros(Float64, n)
+    k = 0
+    @inbounds for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
         k +=1
         dst = sqrt((i - x0)^2 + (j - y0)^2)
         (dst > outer_r) && continue
         # flip i and j in mask
-        g[j, i] = (dst <= inner_r ) ? inner_p : outer_p * exp(hl * dst)
+        Is[k] = j
+        Js[k] = i
+        (dst > outer_r) && continue
+        Vs[k] = (dst <= inner_r ) ? inner_p : outer_p * exp(hl * dst)
     end
-    return nothing
+    sparse(Is, Js, Vs, h, w)
 end
 
 # initializes a new dot
