@@ -1,5 +1,7 @@
 export RepulsionGM, step
 
+using LinearAlgebra
+
 abstract type Thing end
 
 struct Wall <: Thing
@@ -13,6 +15,7 @@ end
 struct Dot <: Thing
     # Dynamics
     radius::Float64
+    mass::Float64
 
     # Kinematics
     pos::SVector{2, Float64}
@@ -33,59 +36,72 @@ end
     dot_repulsion::Float64 = 80.0
     wall_repulsion::Float64 = 50.0
     distance::Float64 = 60.0
-    rep_inertia::Float64 = 0.9
+    dot_mass::Float64 = 0.9
+    dot_radius::Float64 = 20.0
 
     # Kinematics
-    dimensions::Tuple{Float64, Float64} = (100., 100.)
+    area_width::Float64 = 100.0
+    area_height::Float64 = 100.0
+    dimensions::Tuple{Float64, Float64} = (area_width, area_height)
     vel::Float64 = 10.0 # base velocity
 
 
     # Graphics
+    img_width::Int64 = 100
+    img_height::Int64 = 100
     img_dims::Tuple{Int64, Int64} = (100, 100)
+    decay_rate::Float64 = .1
+    min_mag::Float64 = 1E-3
 end
 struct RepulsionState <: GMState
     walls::SVector{4, Wall}
-    objects::SVector{Dot}
+    objects::Vector{Dot}
 end
 
+##Updated upstream
 function RepulsionState(gm::RepulsionGM, dots)
     #walls # define me
     walls = init_walls(gm)
-    RepulsionState(walls, SVector{Dot}(dots))
+    #RepulsionState(walls, SVector{gm.n_dots, Dot}(dots))
+    RepulsionState(walls, collect(Dot, dots))
 end
 
 function init_walls(gm::RepulsionGM)
    ws = Vector{Wall}(undef, 4)
-   @inbounds for (i, (x,y)) in enumerate(Iterators.product((1,-1), (1, -1)))
-        ws[i] = Wall(x, y, gm)
+   d = [gm.dimensions[1] * .5, gm.dimensions[2] * .5, -gm.dimensions[1] * .5, -gm.dimensions[2]*.5]
+   @inbounds for (i, theta) in enumerate([0, pi/2, pi, 3/2 * pi, 2 * pi])
+   ## d should be constant; 
+        #v = [x,y]
+        normal = [cos(theta), sin(theta)]
+        ws[i] = Wall(d[i], normal)
     end
-    return SVector{Wall}(ws)
+    return SVector{4, Wall}(ws)
     
 end
 
 
-# function load(::Type{RepulsionGM}, path::String)
-#     RepulsionGM(;read_json(path)...)
-# end
+####
+function RepulsionState(gm::RepulsionGM, objects::SVector{Dot})
+    walls = SVector{4,Wall}# define me
+    RepulsionState(walls, objects)
+end
+
 
 function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
 
     # Dynamics (computing forces)
     # for each dot compute forces
-    
+    @unpack n_dots = gm
     @unpack walls, objects = state
-    n_dots = length(objects)
     new_dots = Vector{Dot}(undef, n_dots)
     @inbounds for i = 1:n_dots
         facc = zeros(2) # force accumalator
         dot = objects[i]
-        for w in walls
-            force!(facc, w, dot)
+        for w in state.walls
+            force!(facc, gm, w, dot)
         end
         # TODO add interaction with other dots
-        for j = 1:n_dots
-            i !== j && force!(facc, objects[j], dot)
-        end
+
         # kinematics: resolve forces to pos vel
         (new_pos, new_vel) = update_kinematics(gm, dot, facc)
         # also do graphical update
@@ -99,24 +115,25 @@ end
 normalvec(w::Wall, pos) = w.normal
 
 """Computes the force of A -> B"""
-function force!(f::Vector{Float64}, ::Thing, ::Thing)
+function force!(f::Vector{Float64}, dm::RepulsionGM, ::Thing, ::Thing)
     error("Not implemented")
 end
-function force!(f::Vector{Float64}, w::Wall, d::Dot, dm::RepulsionGM)
+function force!(f::Vector{Float64}, dm::RepulsionGM, w::Wall, d::Dot)
+    #multiply unit vector of wall by position of dot 
+    # d - norm|unit_vector * x|
     @unpack pos = d
-    n = normalvec(w, p.pos)
-    #pos_proj = w -> _project(pos, w.p1, w.p2))
+    #normal vec is unit vector; using partial derivatives (derivative of l2 norm)
+    #constant mass system w object interaction
+    #unit_vector = w.normal/sqrt(w.normal[1]^2 + w.normal[2]^2)
+    n = w.d - LinearAlgebra.norm(w.normal .* pos)
+    absolute_force = dm.wall_repulsion*exp(n/(dm.distance^2))
+    f += (absolute_force / n) * (-1 * w.normal)
 
-    v = dot(w.d - p.pos, n)
-    nv = norm(v)
-    absolute_force = dm.wall_repulsion*exp(nv/(dm.distance^2))
-    f += (absolute_force / nv) .* v
-
-    return force
+    return f
 
 end
 
-function force!(f::Vector{Float64}, a::Dot, b::Dot, dm::RepulsionGM)
+function force!(f::Vector{Float64}, dm::RepulsionGM, a::Dot, b::Dot)
     @unpack pos = a
     @unpack other_pos = b
     force = zeros(2)
@@ -126,22 +143,20 @@ function force!(f::Vector{Float64}, a::Dot, b::Dot, dm::RepulsionGM)
         absolute_force = dm.dot_repulsion*exp(nv/(dm.distance^2))
         f += (absolute_force / nv) .* v
     end
-    return force
+    return f
 end
 
-function update_kinematics(gm::RepulsionGM, d::Dot, f::Vector{Float64})
-    new_vel = d.vel
-    new_vel *= gm.rep_inertia
-    new_vel += (1.0-gm.rep_inertia)*f
-    if sum(new_vel) != 0
-        new_vel *= gm.vel/norm(vel)
-    end
 
-    new_pos = d.pos
+function update_kinematics(gm::RepulsionGM, d::Dot, f::Vector{Float64})
+    # treating force directly as velocity; update velocity by x percentage; but f isn't normalized to be similar to v
+    a = f/d.mass
+    new_vel = d.vel + a
+    new_pos = d.pos + new_vel
     return new_pos, new_vel
 end
 
-function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
+
+function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
 
     @unpack area_width, area_height = gm
     @unpack img_width, img_height = gm
@@ -151,27 +166,27 @@ function update_graphics(gm::Repulsion, d::Dot, new_pos::SVector{2, Float64})
                                  img_height, img_width,
                                  area_width, area_height)
     scaled_r = d.radius/area_width*img_width # assuming square
+    @show d.gstate
     decayed = d.gstate * gm.decay_rate
-    droptol!(gstate, gm.min_mag)
+    println("done")
+    @show decayed
+    #droptol!(decayed, gm.min_mag)
+    #print("done again")
+    #@show decayed
     # overlay new render onto memory
-    new_mask = exp_dot_mask(x, y, scaled_r, gm)
-    memory = max.(new_mask, decayed)
-
-    # first "copy" over the previous state as a dense array
-    dstate = Array(d.gstate)
-    # decay img
-    rmul!(dstate, gm.decay_rate)
-    # write new pixels
-    exp_dot_mask(dstate, x, y, scaled_r, gm)
-    gstate = sparse(dstate)
-    droptol!(gstate, gm.min_mag)
-    return gstate
+    #gstate = exp_dot_mask(x, y, scaled_r, gm)
+    #without max, tail gets lost; . means broadcast element-wise
+    #max.(gstate, decayed)
+    #try line by line error
+    #map!(max, gstate, gstate, decayed)
+    #return scaled_r
+    #return gstate
 
 end
 
 
 function update(d::Dot, pos, vel, gstate)
-    Dot(d.radius, pos, vel, gstate)
+    Dot(d.radius, d.mass, pos, vel, gstate)
 end
 
 include("gen.jl")

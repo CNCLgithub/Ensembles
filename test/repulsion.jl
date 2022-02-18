@@ -1,9 +1,9 @@
 using Gen
 using Ensembles
 
-# function recurse(f::Function, x::T, n::Int64)::T where {T}
-#     n === 0 ? x : recurse(f, f(x), n-1)
-# end
+#function recurse(f::Function, x::T, n::Int64)::T where {T}
+#   n === 0 ? x : recurse(f, f(x), n-1)
+#end
 
 function rep_test()
     # TODO
@@ -13,7 +13,7 @@ function rep_test()
     # https://www.gen.dev/dev/ref/gfi/#Gen.simulate
     init_state_tr = Gen.simulate(rpl_init, (gm,))
     # extract what we want from Gen.Trace (hint look at `rpl_init`)
-    init_state = Gen.?(init_state_tr)
+    init_state = Gen.get_retval(init_state_tr)
     current_state = init_state
     display(current_state) # pretty printing
     @show current_state # (expr -> val) : line number
@@ -22,14 +22,15 @@ function rep_test()
     for i = 1:10
         println("on step $(i)")
         current_state = Ensembles.step(gm, current_state)
-        # gstate = zeros(gm.img_dims)
-        # for j = 1:gm.n_dots
-        #     dot = ?
-        #     println("object ${j}")
-        #     gstate .+= dot.gstate
-        # end
-        # gstate ./= gm.n_dots
-        # display(gstate)
+        gstate = zeros(gm.img_dims)
+        for j = 1:gm.n_dots
+            #dot = ?
+            dot = get_objects(gm, Dot)[j]
+            println("object $j")
+            gstate .+= dot.gstate
+        end
+        gstate ./= gm.n_dots
+        display(gstate)
     end
 end
 

@@ -9,7 +9,7 @@ export rpl_init
     y = @trace(uniform(ys[1], ys[2]), :y)
 
     ang = @trace(von_mises(0.0, 1e-5), :ang) # super flat
-    mag = @trace(normal(vel, 1e-2), :std)
+    mag = @trace(normal(gm.vel, 1e-2), :std)
 
     vx = mag * cos(ang)
     vy = mag * sin(ang)

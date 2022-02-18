@@ -1,6 +1,13 @@
 
 const two_pi_sqr = 4.0 * pi * pi
 
+function tracker_bounds(gm::RepulsionGM)
+    d = gm.dimensions
+    xs = (-.5 * d[1], .5 * d[1])
+    ys = (-.5 * d[2], .5*d[2])
+    return (xs,ys)
+end
+
 # translates coordinate from euclidean to image space
 function translate_area_to_img(x::Float64, y::Float64,
                                img_width::Int64, img_height::Int64,
@@ -26,7 +33,7 @@ end
 """
 Writes out a dot mask to matrix
 """
-function exp_dot_mask!(
+function exp_dot_mask(
                        x0::Float64, y0::Float64,
                        r::Float64,
                        w::Int64, h::Int64,
@@ -53,7 +60,6 @@ function exp_dot_mask!(
     @inbounds for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
         k +=1
         dst = sqrt((i - x0)^2 + (j - y0)^2)
-        (dst > outer_r) && continue
         # flip i and j in mask
         Is[k] = j
         Js[k] = i
@@ -66,5 +72,5 @@ end
 # initializes a new dot
 function Dot(gm::RepulsionGM,
              pos::SVector{2, Float64}, vel::SVector{2, Float64})
-    Dot(gm.dot_radius, pos, vel, spzeros(gm.dimensions))
+    Dot(gm.dot_radius, gm.dot_mass, pos, vel, spzeros(gm.img_dims))
 end
