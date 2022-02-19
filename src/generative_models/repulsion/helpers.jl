@@ -30,6 +30,8 @@ function clamp_and_round(v::Float64, c::Int64)::Int64
     end
 end
 
+const ln_hlf = log(0.5)
+
 """
 Writes out a dot mask to matrix
 """
@@ -57,7 +59,7 @@ function exp_dot_mask(
     Js = zeros(Int64, n)
     Vs = zeros(Float64, n)
     k = 0
-    @inbounds for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
+    for (i, j) in Iterators.product(xlow:xhigh, ylow:yhigh)
         k +=1
         dst = sqrt((i - x0)^2 + (j - y0)^2)
         # flip i and j in mask
@@ -73,4 +75,16 @@ end
 function Dot(gm::RepulsionGM,
              pos::SVector{2, Float64}, vel::SVector{2, Float64})
     Dot(gm.dot_radius, gm.dot_mass, pos, vel, spzeros(gm.img_dims))
+end
+
+
+function exp_dot_mask( x0::Float64, y0::Float64,
+                       r::Float64,
+                       w::Int64, h::Int64,
+                       gm::RepulsionGM)
+    exp_dot_mask(x0, y0, r, w, h,
+                 gm.outer_f,
+                 gm.inner_f,
+                 gm.outer_p,
+                 gm.inner_p)
 end

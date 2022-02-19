@@ -2,7 +2,7 @@ bootstrap: docker
 from: nvidia/cuda:11.4.2-cudnn8-devel-ubuntu20.04
 
 %environment
- export PATH=$PATH:"/usr/local/julia-1.7.1/bin"
+ export PATH=$PATH:"/usr/local/julia-1.7.2/bin"
 
 %runscript
   exec bash "$@"
@@ -26,11 +26,10 @@ from: nvidia/cuda:11.4.2-cudnn8-devel-ubuntu20.04
  python3 -m pip install pipenv virtualenv
 
  # setup julia
- wget "https://julialang-s3.julialang.org/bin/linux/x64/1.7/julia-1.7.1-linux-x86_64.tar.gz" \
-     -O "julia.tar.gz"
+ JURL="https://julialang-s3.julialang.org/bin/linux/x64/1.7/julia-1.7.2-linux-x86_64.tar.gz"
+ wget "$JURL" -O "julia.tar.gz"
  tar -xzf "julia.tar.gz" -C "/usr/local/"
  rm "julia.tar.gz"
-
 
  # Add an sbatch workaround
  echo '#!/bin/bash\nssh -y "$HOSTNAME"  sbatch "$@"'  > /usr/bin/sbatch

@@ -34,8 +34,8 @@ end
 
     # Dynamics
     dot_repulsion::Float64 = 80.0
-    wall_repulsion::Float64 = 50.0
-    distance::Float64 = 60.0
+    wall_repulsion::Float64 = 100.0
+    distance::Float64 = 60.0 # TODO: What does this do?
     dot_mass::Float64 = 0.9
     dot_radius::Float64 = 20.0
 
@@ -50,8 +50,12 @@ end
     img_width::Int64 = 100
     img_height::Int64 = 100
     img_dims::Tuple{Int64, Int64} = (100, 100)
-    decay_rate::Float64 = .1
+    decay_rate::Float64 = 0.1
     min_mag::Float64 = 1E-3
+    inner_f::Float64 = 0.75
+    outer_f::Float64 = 3.0
+    inner_p::Float64 = 0.95
+    outer_p::Float64 = 0.3
 end
 struct RepulsionState <: GMState
     walls::SVector{4, Wall}
@@ -109,7 +113,7 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
         new_dots[i] = update(dot, new_pos, new_vel, new_gstate)
     end
 
-    RepulsionState(walls, SVector(new_dots))
+    RepulsionState(walls, collect(Dot,new_dots))
 end
 
 normalvec(w::Wall, pos) = w.normal
@@ -166,22 +170,18 @@ function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
                                  img_height, img_width,
                                  area_width, area_height)
     scaled_r = d.radius/area_width*img_width # assuming square
-    @show d.gstate
-    decayed = d.gstate * gm.decay_rate
-    println("done")
-    @show decayed
-    #droptol!(decayed, gm.min_mag)
-    #print("done again")
-    #@show decayed
-    # overlay new render onto memory
-    #gstate = exp_dot_mask(x, y, scaled_r, gm)
-    #without max, tail gets lost; . means broadcast element-wise
-    #max.(gstate, decayed)
-    #try line by line error
-    #map!(max, gstate, gstate, decayed)
-    #return scaled_r
-    #return gstate
 
+    # Mario: trying to deal with segf when dropping
+    decayed = deepcopy(d.gstate)
+    rmul!(decayed, gm.decay_rate)
+    droptol!(decayed, gm.min_mag)
+
+    # overlay new render onto memory
+    gstate = exp_dot_mask(x, y, scaled_r, img_width, img_height, gm)
+    #without max, tail gets lost; . means broadcast element-wise
+    # max.(gstate, decayed)
+    map!(max, gstate, gstate, decayed)
+    return gstate
 end
 
 

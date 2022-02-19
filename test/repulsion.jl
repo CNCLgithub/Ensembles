@@ -1,5 +1,6 @@
 using Gen
 using Ensembles
+using UnicodePlots
 
 #function recurse(f::Function, x::T, n::Int64)::T where {T}
 #   n === 0 ? x : recurse(f, f(x), n-1)
@@ -9,7 +10,9 @@ function rep_test()
     # TODO
     # first iniitalize a scene
     # then simulation for 10 steps
-    gm = RepulsionGM()
+    gm = RepulsionGM(area_width = 300.0,
+                     area_height = 300.0,
+                     wall_repulsion = 100.)
     # https://www.gen.dev/dev/ref/gfi/#Gen.simulate
     init_state_tr = Gen.simulate(rpl_init, (gm,))
     # extract what we want from Gen.Trace (hint look at `rpl_init`)
@@ -20,17 +23,15 @@ function rep_test()
     # evolve the state n steps
     # For fun, see if you can find a function like `recurse`
     for i = 1:10
-        println("on step $(i)")
         current_state = Ensembles.step(gm, current_state)
         gstate = zeros(gm.img_dims)
         for j = 1:gm.n_dots
             #dot = ?
-            dot = get_objects(gm, Dot)[j]
-            println("object $j")
+            dot = current_state.objects[j]
             gstate .+= dot.gstate
         end
         gstate ./= gm.n_dots
-        display(gstate)
+        println(heatmap(gstate, title = "step $(i)"))
     end
 end
 
