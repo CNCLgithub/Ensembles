@@ -2,6 +2,7 @@ module Ensembles
 
 using Gen
 using Lazy
+using Images
 using Parameters
 using SparseArrays
 using StaticArrays

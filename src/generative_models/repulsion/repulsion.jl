@@ -28,25 +28,25 @@ end
 
 @with_kw struct RepulsionGM <: GenerativeModel
 
-    # Epistemics
+    # EPISTEMICS
     n_dots::Int64 = 2
 
 
-    # Dynamics
+    # DYNAMICS
     dot_repulsion::Float64 = 80.0
     wall_repulsion::Float64 = 100.0
     distance::Float64 = 60.0 # TODO: What does this do?
     dot_mass::Float64 = 0.9
     dot_radius::Float64 = 20.0
 
-    # Kinematics
+    # KINEMATICS
     area_width::Float64 = 100.0
     area_height::Float64 = 100.0
     dimensions::Tuple{Float64, Float64} = (area_width, area_height)
     vel::Float64 = 10.0 # base velocity
 
 
-    # Graphics
+    # GRAPHICS
     img_width::Int64 = 100
     img_height::Int64 = 100
     img_dims::Tuple{Int64, Int64} = (100, 100)
@@ -57,6 +57,8 @@ end
     inner_p::Float64 = 0.95
     outer_p::Float64 = 0.3
 end
+
+
 struct RepulsionState <: GMState
     walls::SVector{4, Wall}
     objects::Vector{Dot}
@@ -187,6 +189,18 @@ end
 
 function update(d::Dot, pos, vel, gstate)
     Dot(d.radius, d.mass, pos, vel, gstate)
+end
+
+function render(gm::RepulsionGM, st::RepulsionState)
+
+    gstate = zeros(gm.img_dims)
+    @inbounds for j = 1:gm.n_dots
+        #dot = ?
+        dot = current_state.objects[j]
+        gstate .+= dot.gstate
+    end
+    rmul!(gstate, 1.0 / gm.n_dots)
+    Gray.(gstate)
 end
 
 include("gen.jl")
