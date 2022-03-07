@@ -66,10 +66,8 @@ end
 
 ##Updated upstream
 function RepulsionState(gm::RepulsionGM, dots)
-    #walls # define me
     walls = init_walls(gm)
-    #RepulsionState(walls, SVector{gm.n_dots, Dot}(dots))
-    RepulsionState(walls, collect(Dot, dots))
+    RepulsionState(walls, dots)
 end
 
 function init_walls(gm::RepulsionGM)
@@ -84,14 +82,6 @@ function init_walls(gm::RepulsionGM)
     return SVector{4, Wall}(ws)
     
 end
-
-
-####
-function RepulsionState(gm::RepulsionGM, objects::SVector{Dot})
-    walls = SVector{4,Wall}# define me
-    RepulsionState(walls, objects)
-end
-
 
 function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
 
