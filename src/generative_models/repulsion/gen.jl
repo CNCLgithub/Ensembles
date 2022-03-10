@@ -16,7 +16,8 @@ export rpl_init
 
     pos = SVector{2, Float64}([x, y])
     vel = SVector{2, Float64}([vx, vy])
-    return Dot(gm, pos, vel)
+    new_dot::Dot = Dot(gm, pos, vel)
+    return new_dot
 end
 
 
@@ -26,7 +27,7 @@ Samples a random scene
 @gen static function rpl_init(gm::RepulsionGM)
     gms = fill(gm, gm.n_dots)
     trackers = @trace(Gen.Map(rpl_tracker)(gms), :trackers)
-    state = RepulsionState(gm, trackers)
+    state::RepulsionState = RepulsionState(gm, trackers)
     return state
 end
 

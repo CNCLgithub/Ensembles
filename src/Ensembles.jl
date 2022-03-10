@@ -15,7 +15,7 @@ include("generative_models/generative_models.jl")
 
 # interface for defining dgps
 # defines things like datasets
-#include("dgp/dgp.jl")
+include("dgp.jl")
 
 # TODO: implement me!
 

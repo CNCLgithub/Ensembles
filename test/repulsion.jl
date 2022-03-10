@@ -18,8 +18,6 @@ function rep_test()
     # extract what we want from Gen.Trace (hint look at `rpl_init`)
     init_state = Gen.get_retval(init_state_tr)
     current_state = init_state
-    display(current_state) # pretty printing
-    @show current_state # (expr -> val) : line number
     # evolve the state n steps
     # For fun, see if you can find a function like `recurse`
     for i = 1:10
@@ -36,4 +34,4 @@ function rep_test()
 end
 
 println("performing simple test")
-rep_test()
+rep_test();
