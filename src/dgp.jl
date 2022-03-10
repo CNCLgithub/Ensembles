@@ -5,7 +5,7 @@ abstract type DGP end
     trials::Int64 = 5
     # number of steps per trial
     k::Int64 = 10
-    # maximum distance between trackers for a valid step
+    # maximum distance between trackers for a valid step 
     max_distance::Float64 = 100.0
     # minimum distance between tracker for a valid step
     min_distance::Float64 = 20.0
@@ -51,9 +51,12 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
     for i = 1:t
         gstate = zeros(gm.img_dims)
         for j = 1:gm.n_dots
-            # TODO fill in with mean of objects for time `i`
             # see `write_states` above and the file `test/repulsion.jl`
+
+            sum = 0 
+            sum += states[i].objects[j]
         end
+        t[i] = sum/n_dots
 
         # see https://juliaimages.org/latest/function_reference/#ref_io
         # for how to save image
@@ -73,14 +76,14 @@ Returns `true` if all of the following are true:
 """
 function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)::Bool
     # see implementation above
-    ds = distances(st.objects)
+    ds = distances(st.objects).- (gm.dot_radius * 2)
+
     # TODO make sure to incorporate the radius of each object
     # we can assume that the radius is fixed
     # objects dont overlap
-    thresh = p.min_distance + gm.dot_radius
-    # zero along diag
-    # number of entries less than limit should be the zero diag
-    sum(minimum(ds) .< thresh) === size(ds, 1)
+    thresh = p.min_distance
+    #shouldn't it be 0
+    sum(minimum(ds) .> thresh) === size(ds, 1)
 end
 
 """
@@ -91,7 +94,9 @@ Returns 'trues' if:
 """
 function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     # used `p.max_distance`
-    true
+    ds = distances(st.objects).- (gm.dot_radius * 2)
+    thresh = p.max_distance 
+    sum(minimum(ds).<thresh) == size (ds,1))
 end
 
 
@@ -100,7 +105,6 @@ function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
 
     if !initial_state_constraint(init_state)
         # overlapping, recursively try again
-        # TODO: add stepping procedure?
         # apply step and check distances
         # once passes, set all velocities to zero
         return dgp(gm, k; tries = tries - 1)
