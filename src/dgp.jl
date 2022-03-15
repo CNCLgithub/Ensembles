@@ -81,9 +81,7 @@ function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::Repulsio
     # TODO make sure to incorporate the radius of each object
     # we can assume that the radius is fixed
     # objects dont overlap
-    thresh = p.min_distance
-    #shouldn't it be 0
-    sum(minimum(ds) .> thresh) === size(ds, 1)
+    sum(minimum(ds) .> 0) === size(ds, 1)
 end
 
 """
@@ -95,8 +93,8 @@ Returns 'trues' if:
 function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     # used `p.max_distance`
     ds = distances(st.objects).- (gm.dot_radius * 2)
-    thresh = p.max_distance 
-    sum(minimum(ds).<thresh) == size (ds,1))
+    #thresh = p.max_distance 
+    sum(p.min_distance<minimum(ds).<p.max_distance) == size (ds,1))
 end
 
 
