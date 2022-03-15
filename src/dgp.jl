@@ -49,18 +49,17 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
     isdir(img_path) || mkpath(img_path)
 
     for i = 1:t
-        gstate = zeros(gm.img_dims)
-        for j = 1:gm.n_dots
-            # see `write_states` above and the file `test/repulsion.jl`
-
-            sum = 0 
-            sum += states[i].objects[j]
+        #gstate = zeros(gm.img_dims)
+        for i = 1:t, j = 1:gm.n_dots
+          # see `write_states` above and the file `test/repulsion.jl`
+            img_file = "$(img_path)/$(i).png"
+            gstate = states[i].objects[j].gstate   
+            save(img_file, gstate)
         end
         t[i] = sum/n_dots
 
         # see https://juliaimages.org/latest/function_reference/#ref_io
         # for how to save image
-        img_file = "$(img_path)/$(i).png"
         save(img_file, gstate)
     end
     return nothing
@@ -76,12 +75,12 @@ Returns `true` if all of the following are true:
 """
 function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)::Bool
     # see implementation above
-    ds = distances(st.objects).- (gm.dot_radius * 2)
+    #ds = distances(st.objects).- (gm.dot_radius * 2)
 
     # TODO make sure to incorporate the radius of each object
     # we can assume that the radius is fixed
     # objects dont overlap
-    sum(minimum(ds) .> 0) === size(ds, 1)
+    sum(ds .<= (gm.dot_radius * 2)) === size(ds, 1)
 end
 
 """
@@ -94,11 +93,14 @@ function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     # used `p.max_distance`
     ds = distances(st.objects).- (gm.dot_radius * 2)
     #thresh = p.max_distance 
-    sum(p.min_distance<minimum(ds).<p.max_distance) == size (ds,1))
+    #get the first element that's not 0 
+    (sum(xs .< ((gm.dot_radius * 2) + min_distance)) === size(xs, 1)) & !(any( xs .> (max_distance + (gm.dot_radius * 2)))
 end
 
 
 function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
+    if (tries <= 0):
+        return nothing
     init_state = rpl_init(gm)
 
     if !initial_state_constraint(init_state)
