@@ -49,18 +49,20 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
     isdir(img_path) || mkpath(img_path)
 
     for i = 1:t
-        #gstate = zeros(gm.img_dims)
-        for i = 1:t, j = 1:gm.n_dots
-          # see `write_states` above and the file `test/repulsion.jl`
-            img_file = "$(img_path)/$(i).png"
-            gstate = states[i].objects[j].gstate   
-            save(img_file, gstate)
+        gstate = zeros(gm.img_dims)
+        for j = 1:gm.n_dots
+            # see `write_states` above and the file `test/repulsion.jl`
+
+            sum = 0 
+            sum += states[i].objects[j]
+            img_file = "$(img_path)/$(i)/$(j).png"
         end
-        t[i] = sum/n_dots
+
 
         # see https://juliaimages.org/latest/function_reference/#ref_io
         # for how to save image
-        save(img_file, gstate)
+        
+
     end
     return nothing
 end
