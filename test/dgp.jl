@@ -11,12 +11,14 @@ function rep_test()
     # TODO
     # first iniitalize a scene
     # then simulation for 10 steps
-    gm = RepulsionGM(area_width = 300.0,
+    gm = RepulsionGM(n_dots = 20,
+                    area_width = 300.0,
                      area_height = 300.0,
                      wall_repulsion = 100.)
-    rdgp = RepulsionDGP(out_dir = "/spaths/datasets/pilot")
-
+    rdgp = RepulsionDGP(trials = 10, k=20, out_dir = "/spaths/datasets/pilot")
+    dgp(p=rdgp, gm=gm; tries= 100)
 end
+
 
 println("performing simple test")
 rep_test()
