@@ -1,8 +1,5 @@
 using Gen
 using Ensembles
-using UnicodePlots
-using 
-export DGP, RepulsionDGP, dgp
 
 #function recurse(f::Function, x::T, n::Int64)::T where {T}
 #   n === 0 ? x : recurse(f, f(x), n-1)
@@ -17,7 +14,7 @@ function rep_test()
                      area_height = 300.0,
                      wall_repulsion = 100.)
     rdgp = RepulsionDGP(trials = 10, k=20, out_dir = "/spaths/datasets/pilot")
-    dgp(p=rdgp, gm=gm; tries= 100)
+    dgp(rdgp, gm; tries= 100)
 end
 
 
