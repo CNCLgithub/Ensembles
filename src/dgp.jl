@@ -55,7 +55,7 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
 
             sum = 0 
             sum += states[i].objects[j]
-            img_file = "$(img_path)/$(i)/$(j).png"
+            img_file = "$(img_path)/$(i)_$(j).png"
         end
 
 
@@ -96,13 +96,14 @@ function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     ds = distances(st.objects).- (gm.dot_radius * 2)
     #thresh = p.max_distance 
     #get the first element that's not 0 
-    (sum(xs .< ((gm.dot_radius * 2) + min_distance)) === size(xs, 1)) & !(any( xs .> (max_distance + (gm.dot_radius * 2)))
+    (sum(xs .< ((gm.dot_radius * 2) + min_distance)) === size(xs, 1)) & !(any( xs .> (max_distance + (gm.dot_radius * 2))))
 end
 
 
 function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
-    if (tries <= 0):
+    if (tries <= 0)
         return nothing
+    end
     init_state = rpl_init(gm)
 
     if !initial_state_constraint(init_state)
