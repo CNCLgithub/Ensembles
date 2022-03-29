@@ -1,3 +1,4 @@
+export DGP, RepulsionDGP, dgp
 abstract type DGP end
 
 @with_kw struct RepulsionDGP <: DGP
@@ -77,7 +78,7 @@ Returns `true` if all of the following are true:
 """
 function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)::Bool
     # see implementation above
-    #ds = distances(st.objects).- (gm.dot_radius * 2)
+    ds = distances(st.objects).- (gm.dot_radius * 2)
 
     # TODO make sure to incorporate the radius of each object
     # we can assume that the radius is fixed
@@ -106,11 +107,11 @@ function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
     end
     init_state = rpl_init(gm)
 
-    if !initial_state_constraint(init_state)
+    if !initial_state_constraint(p, gm, init_state)
         # overlapping, recursively try again
         # apply step and check distances
         # once passes, set all velocities to zero
-        return dgp(gm, k; tries = tries - 1)
+        return dgp(p, gm; tries = tries - 1)
     end
 
     # initial state passes, begin generating steps
