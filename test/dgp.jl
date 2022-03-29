@@ -1,6 +1,7 @@
 using Gen
 using Ensembles
 using UnicodePlots
+using 
 export DGP, RepulsionDGP, dgp
 
 #function recurse(f::Function, x::T, n::Int64)::T where {T}
