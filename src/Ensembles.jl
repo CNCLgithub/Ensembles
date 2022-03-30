@@ -1,6 +1,7 @@
 module Ensembles
 
 using Gen
+using JSON
 using Lazy
 using Images
 using Parameters

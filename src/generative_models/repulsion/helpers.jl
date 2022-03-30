@@ -3,8 +3,8 @@ const two_pi_sqr = 4.0 * pi * pi
 
 function tracker_bounds(gm::RepulsionGM)
     d = gm.dimensions
-    xs = (-.5 * d[1], .5 * d[1])
-    ys = (-.5 * d[2], .5*d[2])
+    xs = (-.4 * d[1], .4 * d[1])
+    ys = (-.4 * d[2], .4*d[2])
     return (xs,ys)
 end
 
@@ -13,11 +13,11 @@ function translate_area_to_img(x::Float64, y::Float64,
                                img_width::Int64, img_height::Int64,
                                area_width::Float64, area_height::Float64)
 
-    x *= img_width/area_width
+    x = x * img_width/area_width
     x += img_width/2
 
     # inverting y
-    y *= -1 * img_height/area_height
+    y = y * -1 * img_height/area_height
     y += img_height/2
 
     return x, y
@@ -50,6 +50,7 @@ function exp_dot_mask(
     # half-life is 1/6 outer - inner
     hl = 3.0 * ln_hlf / abs(outer_r - inner_r)
 
+    @show x0, y0, outer_r, inner_r
     xlow = clamp_and_round(x0 - outer_r, w)
     xhigh = clamp_and_round(x0 + outer_r, w)
     ylow = clamp_and_round(y0 - outer_r, h)
@@ -74,7 +75,9 @@ end
 # initializes a new dot
 function Dot(gm::RepulsionGM,
              pos::SVector{2, Float64}, vel::SVector{2, Float64})
-    Dot(gm.dot_radius, gm.dot_mass, pos, vel, spzeros(gm.img_dims))
+    t_dot = Dot(gm.dot_radius, gm.dot_mass, pos, vel, spzeros(gm.img_dims))
+    gs = update_graphics(gm, t_dot, pos)
+    update(t_dot, pos, vel, gs)
 end
 
 

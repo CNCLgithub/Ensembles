@@ -1,3 +1,6 @@
+using UnicodePlots
+
+
 export DGP, RepulsionDGP, dgp
 abstract type DGP end
 
@@ -11,6 +14,7 @@ abstract type DGP end
     # minimum distance between tracker for a valid step
     min_distance::Float64 = 20.0
 
+    tries::Int64 = 10000
     out_dir::String
 end
 
@@ -32,14 +36,18 @@ end
 
 function write_states(gm::RepulsionGM, states::Vector{RepulsionState}, path::String)
     t = length(states)
-    positions = Array{Float64}(undef, t, 2, gm.n_dots)
-    for i = 1:t, j = 1:gm.n_dots
-        positions[i, :, j] = states[i].objects[j].pos[:]
+    positions = []
+    for i = 1:t
+        t_step = []
+        for j = 1:gm.n_dots
+            push!(t_step, states[i].objects[j].pos[:])
+        end
+        push!(positions, t_step)
     end
-    data = Dict(positions = positions)
+    data = Dict(:positions => positions)
     json_path = "$(path)/states.json"
     open(json_path, "w") do f
-        write(f, json(data))
+        write(f, JSON.json(data))
     end
     return nothing
 end
@@ -50,20 +58,16 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
     isdir(img_path) || mkpath(img_path)
 
     for i = 1:t
-        gstate = zeros(gm.img_dims)
         for j = 1:gm.n_dots
             # see `write_states` above and the file `test/repulsion.jl`
-
-            sum = 0 
-            sum += states[i].objects[j]
+            obj = states[i].objects[j]
             img_file = "$(img_path)/$(i)_$(j).png"
+            # see https://juliaimages.org/latest/function_reference/#ref_io
+            # for how to save image
+            # println(img_file)
+            # display(obj.gstate)
+            save(img_file, obj.gstate)
         end
-
-
-        # see https://juliaimages.org/latest/function_reference/#ref_io
-        # for how to save image
-        
-
     end
     return nothing
 end
@@ -97,21 +101,30 @@ function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     ds = distances(st.objects).- (gm.dot_radius * 2)
     #thresh = p.max_distance 
     #get the first element that's not 0 
-    (sum(xs .< ((gm.dot_radius * 2) + min_distance)) === size(xs, 1)) & !(any( xs .> (max_distance + (gm.dot_radius * 2))))
+    (sum(ds .< ((gm.dot_radius * 2) + p.min_distance)) === size(ds, 1)) &
+        !(any(ds .> (p.max_distance + (gm.dot_radius * 2))))
 end
 
 
-function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
+"""
+
+Generates a single trial
+"""
+function dgp_trial(p::RepulsionDGP, gm::RepulsionGM, idx::Int64,
+                   tries::Int64)
     if (tries <= 0)
+        # Warning("Could not generate trial")
         return nothing
     end
     init_state = rpl_init(gm)
+
+
 
     if !initial_state_constraint(p, gm, init_state)
         # overlapping, recursively try again
         # apply step and check distances
         # once passes, set all velocities to zero
-        return dgp(p, gm; tries = tries - 1)
+        return dgp_trial(p, gm, idx, tries - 1)
     end
 
     # initial state passes, begin generating steps
@@ -120,14 +133,23 @@ function dgp(p::RepulsionDGP, gm::RepulsionGM; tries::Int64 = 100)
     @inbounds for t = 2:p.k
         states[t] = Ensembles.step(gm, states[t - 1])
         # check to see if objects diverge too much
-        if !step_constraint(gm, states[t])
+        if !step_constraint(p, gm, states[t])
             # restart if failed
-            return dgp(gm, k; tries = tries - 1)
+            return dgp_trial(p, gm, idx, tries - 1)
         end
     end
 
     # everything is passed
     # save state and images
-    write_state(gm, states, path)
-    write_graphics(gm, states, path)
+    trial_path = "$(p.out_dir)/$(idx)"
+    isdir(trial_path) || mkpath(trial_path)
+    write_states(gm, states, trial_path)
+    write_graphics(gm, states, trial_path)
+end
+
+function dgp(p::RepulsionDGP, gm::RepulsionGM)
+    isdir(p.out_dir) || mkpath(p.out_dir)
+    for i = 1:p.trials
+        dgp_trial(p, gm, i, p.tries)
+    end
 end
