@@ -10,7 +10,7 @@ function rep_test()
     Random.seed!(123)
     gm = RepulsionGM(n_dots = 2)
     rdgp = RepulsionDGP(trials = 1,
-                        k=60,
+                        k=120,
                         out_dir = "/spaths/datasets/test")
     dgp(rdgp, gm)
 end

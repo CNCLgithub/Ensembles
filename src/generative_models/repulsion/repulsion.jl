@@ -34,9 +34,9 @@ end
 
     # DYNAMICS
     dot_repulsion::Float64 = 80.0
-    wall_repulsion::Float64 = 0.10
-    distance::Float64 = 10.0
-    dot_mass::Float64 = 0.9
+    wall_repulsion::Float64 = 0.5
+    distance::Float64 = 20.0
+    dot_mass::Float64 = 1.0
     dot_radius::Float64 = 10.0
 
     # KINEMATICS
@@ -47,9 +47,9 @@ end
 
 
     # GRAPHICS
-    img_width::Int64 = 100
-    img_height::Int64 = 100
-    img_dims::Tuple{Int64, Int64} = (100, 100)
+    img_width::Int64 = 128
+    img_height::Int64 = 128
+    img_dims::Tuple{Int64, Int64} = (128, 128)
     decay_rate::Float64 = 0.0
     min_mag::Float64 = 1E-4
     inner_f::Float64 = 1.0
@@ -70,10 +70,12 @@ function RepulsionState(gm::RepulsionGM, dots)
     RepulsionState(walls, dots)
 end
 
+const WALL_ANGLES = [0, pi/2, pi, 3/2 * pi]
+
 function init_walls(gm::RepulsionGM)
    ws = Vector{Wall}(undef, 4)
    d = [gm.dimensions[1] * .5, gm.dimensions[2] * .5, -gm.dimensions[1] * .5, -gm.dimensions[2]*.5]
-   for (i, theta) in enumerate([0, pi/2, pi, 3/2 * pi])
+   @inbounds for (i, theta) in enumerate(WALL_ANGLES)
    ## d should be constant; 
         #v = [x,y]
         normal = [cos(theta), sin(theta)]
@@ -98,7 +100,7 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
         end
 
         # TODO add interaction with other dots
-
+        #
         # kinematics: resolve forces to pos vel
         (new_pos, new_vel) = update_kinematics(gm, dot, facc)
         # also do graphical update
@@ -122,14 +124,11 @@ function force!(f::Vector{Float64}, dm::RepulsionGM, w::Wall, d::Dot)
     #normal vec is unit vector; using partial derivatives (derivative of l2 norm)
     #constant mass system w object interaction
     #unit_vector = w.normal/sqrt(w.normal[1]^2 + w.normal[2]^2)
-    n = abs(w.d - LinearAlgebra.norm(w.normal .* pos))
-    @show d.pos
-    @show d.vel
-    @show n
+    # n = abs(w.d + LinearAlgebra.norm(w.normal .* pos))
+    n = LinearAlgebra.norm(w.normal .* pos + w.normal .* w.d)
     # absolute_force = dm.wall_repulsion*exp(n/(dm.distance^2))
     # absolute_force = n > dm.distance ? 0 : exp(log(1.0) - log(n) - log(dm.wall_repulsion))
     absolute_force = exp(dm.distance / (n * dm.wall_repulsion))
-    @show absolute_force
     f .+= absolute_force * (w.normal)
     return nothing
 
@@ -153,7 +152,6 @@ function update_kinematics(gm::RepulsionGM, d::Dot, f::Vector{Float64})
     # treating force directly as velocity; update velocity by x percentage; but f isn't normalized to be similar to v
     a = f/d.mass
     new_vel = d.vel + a
-    @show a
     new_pos = clamp.(d.pos + new_vel, -gm.area_height, gm.area_height)
     return new_pos, new_vel
 end
@@ -164,7 +162,6 @@ function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
     @unpack area_width, area_height = gm
     @unpack img_width, img_height = gm
 
-    @show d.pos
     # going from area dims to img dims
     x, y = translate_area_to_img(d.pos...,
                                  img_height, img_width,

@@ -10,7 +10,7 @@ abstract type DGP end
     # number of steps per trial
     k::Int64 = 10
     # maximum distance between trackers for a valid step 
-    max_distance::Float64 = 100.0
+    max_distance::Float64 = Inf
     # minimum distance between tracker for a valid step
     min_distance::Float64 = 20.0
 
