@@ -33,8 +33,8 @@ end
 
 
     # DYNAMICS
-    dot_repulsion::Float64 = 80.0
-    wall_repulsion::Float64 = 0.5
+    dot_repulsion::Float64 = 0.01
+    wall_repulsion::Float64 = 1.5
     distance::Float64 = 20.0
     dot_mass::Float64 = 1.0
     dot_radius::Float64 = 10.0
@@ -43,6 +43,7 @@ end
     area_width::Float64 = 300.0
     area_height::Float64 = 300.0
     dimensions::Tuple{Float64, Float64} = (area_width, area_height)
+    #play around and increase vel
     vel::Float64 = 10.0 # base velocity
 
 
@@ -76,13 +77,13 @@ function init_walls(gm::RepulsionGM)
    ws = Vector{Wall}(undef, 4)
    d = [gm.dimensions[1] * .5, gm.dimensions[2] * .5, -gm.dimensions[1] * .5, -gm.dimensions[2]*.5]
    @inbounds for (i, theta) in enumerate(WALL_ANGLES)
-   ## d should be constant; 
+   ## d should be constant;
         #v = [x,y]
         normal = [cos(theta), sin(theta)]
         ws[i] = Wall(d[i], normal)
     end
     return SVector{4, Wall}(ws)
-    
+
 end
 
 function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
@@ -97,6 +98,10 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
         dot = objects[i]
         for w in state.walls
             force!(facc, gm, w, dot)
+        end
+        for j = 1:n_dots
+            i==j && continue
+            force!(facc, gm, dot, objects[j])
         end
 
         # TODO add interaction with other dots
@@ -118,7 +123,7 @@ function force!(f::Vector{Float64}, dm::RepulsionGM, ::Thing, ::Thing)
     error("Not implemented")
 end
 function force!(f::Vector{Float64}, dm::RepulsionGM, w::Wall, d::Dot)
-    #multiply unit vector of wall by position of dot 
+    #multiply unit vector of wall by position of dot
     # d - norm|unit_vector * x|
     @unpack pos = d
     #normal vec is unit vector; using partial derivatives (derivative of l2 norm)
@@ -128,23 +133,30 @@ function force!(f::Vector{Float64}, dm::RepulsionGM, w::Wall, d::Dot)
     n = LinearAlgebra.norm(w.normal .* pos + w.normal .* w.d)
     # absolute_force = dm.wall_repulsion*exp(n/(dm.distance^2))
     # absolute_force = n > dm.distance ? 0 : exp(log(1.0) - log(n) - log(dm.wall_repulsion))
-    absolute_force = exp(dm.distance / (n * dm.wall_repulsion))
+    thresh = 2 * dm.distance
+    absolute_force = (n > thresh) ? 0. : exp(dm.distance / (n * dm.wall_repulsion))
     f .+= absolute_force * (w.normal)
     return nothing
 
 end
 
 function force!(f::Vector{Float64}, dm::RepulsionGM, a::Dot, b::Dot)
-    @unpack pos = a
-    @unpack other_pos = b
-    force = zeros(2)
-    for j = 1:length(other_pos)
-        v = pos - other_pos[j]
-        nv = norm(v)
-        absolute_force = dm.dot_repulsion*exp(nv/(dm.distance^2))
-        f .+= (absolute_force / nv) .* v
+    v = a.pos- b.pos
+    norm_v = norm(v)
+    thresh = 5*b.radius
+    #piecewise linear function; use gm.distance and dot.repulsion to define intercepts
+    #absolute_force =  exp(dm.distance / (norm_v * dm.dot_repulsion))
+    absolute_force = dm.dot_repulsion * (norm_v - dm.distance)
+    @show norm_v
+    @show thresh
+    @show absolute_force
+    if norm_v>thresh
+        absolute_force *= -1.0
     end
-    return f
+    #norm_v>thresh && absolute_force .*=-1
+    @show absolute_force .* normalize(v)
+    f .+= absolute_force .* normalize(v)
+    return nothing
 end
 
 
