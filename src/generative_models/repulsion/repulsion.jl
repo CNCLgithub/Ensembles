@@ -44,7 +44,7 @@ end
     area_height::Float64 = 300.0
     dimensions::Tuple{Float64, Float64} = (area_width, area_height)
     #play around and increase vel
-    vel::Float64 = 10.0 # base velocity
+    vel::Float64 = 5.0 # base velocity
 
 
     # GRAPHICS
