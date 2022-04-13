@@ -50,7 +50,7 @@ end
     # GRAPHICS
     img_width::Int64 = 128
     img_height::Int64 = 128
-    img_dims::Tuple{Int64, Int64} = (128, 128)
+    img_dims::Tuple{Int64, Int64} = (img_width,img_height)
     decay_rate::Float64 = 0.0
     min_mag::Float64 = 1E-4
     inner_f::Float64 = 1.0
@@ -143,18 +143,11 @@ end
 function force!(f::Vector{Float64}, dm::RepulsionGM, a::Dot, b::Dot)
     v = a.pos- b.pos
     norm_v = norm(v)
-    thresh = 5*b.radius
-    #piecewise linear function; use gm.distance and dot.repulsion to define intercepts
-    #absolute_force =  exp(dm.distance / (norm_v * dm.dot_repulsion))
-    absolute_force = dm.dot_repulsion * (norm_v - dm.distance)
-    @show norm_v
-    @show thresh
-    @show absolute_force
+    thresh = 4*b.radius
+    absolute_force = (norm_v > thresh) ? 0. : exp(dm.distance / (norm_v * dm.dot_repulsion))
     if norm_v>thresh
         absolute_force *= -1.0
     end
-    #norm_v>thresh && absolute_force .*=-1
-    @show absolute_force .* normalize(v)
     f .+= absolute_force .* normalize(v)
     return nothing
 end
@@ -179,6 +172,7 @@ function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
                                  img_height, img_width,
                                  area_width, area_height)
     scaled_r = d.radius/area_width*img_width # assuming square
+    gstate = exp_dot_mask(x, y, scaled_r, img_width, img_height, gm)
 
     # Mario: trying to deal with segf when dropping
     decayed = deepcopy(d.gstate)
@@ -186,10 +180,10 @@ function update_graphics(gm::RepulsionGM, d::Dot, new_pos::SVector{2, Float64})
     droptol!(decayed, gm.min_mag)
 
     # overlay new render onto memory
-    gstate = exp_dot_mask(x, y, scaled_r, img_width, img_height, gm)
+
     #without max, tail gets lost; . means broadcast element-wise
-    # max.(gstate, decayed)
-    map!(max, gstate, gstate, decayed)
+    max.(gstate, decayed)
+    #map!(max, gstate, gstate, decayed)
     return gstate
 end
 

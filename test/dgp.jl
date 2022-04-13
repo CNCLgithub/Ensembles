@@ -8,9 +8,17 @@ using Ensembles
 
 function rep_test()
     Random.seed!(123)
-    gm = RepulsionGM(n_dots = 2)
-    rdgp = RepulsionDGP(trials = 1,
-                        k=50,
+    gm = RepulsionGM(n_dots = 6,
+                    area_width = 600.0,
+                    area_height = 600.0,
+                    img_width = 512,
+                    img_height = 512,
+                    dot_repulsion= 1.)
+    rdgp = RepulsionDGP(trials = 2,
+                        k=240,
+                        max_distance=Inf,
+                        min_distance=-Inf,
+                        tries=1e7,
                         out_dir = "/spaths/datasets/test")
     dgp(rdgp, gm)
 end

@@ -9,7 +9,7 @@ abstract type DGP end
     trials::Int64 = 5
     # number of steps per trial
     k::Int64 = 10
-    # maximum distance between trackers for a valid step 
+    # maximum distance between trackers for a valid step
     max_distance::Float64 = Inf
     # minimum distance between tracker for a valid step
     min_distance::Float64 = 20.0
@@ -56,8 +56,8 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
     t = length(states)
     img_path = "$(path)/images"
     isdir(img_path) || mkpath(img_path)
-
     for i = 1:t
+        gstate = zeros(gm.img_dims)
         for j = 1:gm.n_dots
             # see `write_states` above and the file `test/repulsion.jl`
             obj = states[i].objects[j]
@@ -66,8 +66,14 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
             # for how to save image
             # println(img_file)
             # display(obj.gstate)
+            gstate .+= obj.gstate
             save(img_file, obj.gstate)
         end
+        #gstate ./= gm.n_dots
+        clamp!(gstate,0.,1.)
+        scene_file = "$(img_path)/$(i).png"
+        save(scene_file, gstate)
+
     end
     return nothing
 end
@@ -78,7 +84,7 @@ end
 
 Returns `true` if all of the following are true:
 
-- none of the objects overlap
+- none of the objects overlapreturn true
 """
 function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)::Bool
     # see implementation above
@@ -88,6 +94,7 @@ function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::Repulsio
     # we can assume that the radius is fixed
     # objects dont overlap
     sum(ds .<= (gm.dot_radius * 2)) === size(ds, 1)
+
 end
 
 """
@@ -99,10 +106,12 @@ Returns 'trues' if:
 function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     # used `p.max_distance`
     ds = distances(st.objects).- (gm.dot_radius * 2)
-    #thresh = p.max_distance 
-    #get the first element that's not 0 
+    #thresh = p.max_distance
+    #get the first element that's not 0
     (sum(ds .< ((gm.dot_radius * 2) + p.min_distance)) === size(ds, 1)) &
         !(any(ds .> (p.max_distance + (gm.dot_radius * 2))))
+    return true
+
 end
 
 
@@ -110,12 +119,8 @@ end
 
 Generates a single trial
 """
-function dgp_trial(p::RepulsionDGP, gm::RepulsionGM, idx::Int64,
-                   tries::Int64)
-    if (tries <= 0)
-        # Warning("Could not generate trial")
-        return nothing
-    end
+function dgp_trial(p::RepulsionDGP, gm::RepulsionGM, idx::Int64)
+
     init_state = rpl_init(gm)
 
 
@@ -124,7 +129,8 @@ function dgp_trial(p::RepulsionDGP, gm::RepulsionGM, idx::Int64,
         # overlapping, recursively try again
         # apply step and check distances
         # once passes, set all velocities to zero
-        return dgp_trial(p, gm, idx, tries - 1)
+        #return dgp_trial(p, gm, idx, tries - 1)
+        return false
     end
 
     # initial state passes, begin generating steps
@@ -135,21 +141,24 @@ function dgp_trial(p::RepulsionDGP, gm::RepulsionGM, idx::Int64,
         # check to see if objects diverge too much
         if !step_constraint(p, gm, states[t])
             # restart if failed
-            return dgp_trial(p, gm, idx, tries - 1)
+            #return dgp_trial(p, gm, idx, tries - 1)
+            return false
         end
     end
-
     # everything is passed
     # save state and images
     trial_path = "$(p.out_dir)/$(idx)"
     isdir(trial_path) || mkpath(trial_path)
     write_states(gm, states, trial_path)
     write_graphics(gm, states, trial_path)
+    return true
 end
 
 function dgp(p::RepulsionDGP, gm::RepulsionGM)
     isdir(p.out_dir) || mkpath(p.out_dir)
     for i = 1:p.trials
-        dgp_trial(p, gm, i, p.tries)
+        for _ = 1:p.tries
+            dgp_trial(p, gm, i) && break
+        end
     end
 end
