@@ -37,6 +37,8 @@ end
 function write_states(gm::RepulsionGM, states::Vector{RepulsionState}, path::String)
     t = length(states)
     positions = []
+    state_path = "$(path)/serialized"
+    isdir(state_path) || mkpath(state_path)
     for i = 1:t
         t_step = []
         for j = 1:gm.n_dots
@@ -49,6 +51,33 @@ function write_states(gm::RepulsionGM, states::Vector{RepulsionState}, path::Str
     open(json_path, "w") do f
         write(f, JSON.json(data))
     end
+
+    for i = 1:t
+        gstate = zeros(gm.img_dims)
+        for j = 1:gm.n_dots
+            # see `write_states` above and the file `test/repulsion.jl`
+            obj = states[i].objects[j]
+            gstate = states[i].gstate[j]
+            obj = update(obj, obj.pos, obj.vel, gstate)
+            json_state_path = "$(state_path)/$(i)_$(j).json"
+            open(json_state_path, "w") do f
+                write(f, JSON.json(obj))
+            end
+            # img_file = "$(img_path)/$(i)_$(j).png"
+            # # see https://juliaimages.org/latest/function_reference/#ref_io
+            # # for how to save image
+            # # println(img_file)
+            # # display(obj.gstate)
+            # gstate .+= obj.gstate
+            # save(img_file, obj.gstate)
+        end
+        # #gstate ./= gm.n_dots
+        # clamp!(gstate,0.,1.)
+        # scene_file = "$(img_path)/$(i).png"
+        # save(scene_file, gstate)
+
+    end
+
     return nothing
 end
 

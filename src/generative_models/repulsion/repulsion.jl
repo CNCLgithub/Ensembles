@@ -25,6 +25,13 @@ struct Dot <: Thing
     gstate::SparseMatrixCSC{Float64} # graphics state
 end
 
+JSON.lower(d::Dot) = Dict(
+    radius  => d.radius,
+    mass => d.mass,
+    pos => d.pos,
+    vel => d.vel,
+    gstate => d.gstate
+)
 
 @with_kw struct RepulsionGM <: GenerativeModel
 
@@ -63,12 +70,14 @@ end
 struct RepulsionState <: GMState
     walls::SVector{4, Wall}
     objects::Vector{Dot}
+    gstate::Vector{SparseMatrixCSC{Float64}}
 end
 
 ##Updated upstream
 function RepulsionState(gm::RepulsionGM, dots)
     walls = init_walls(gm)
-    RepulsionState(walls, dots)
+    empty_state = spzeros(dots[1].gstate)
+    RepulsionState(walls, dots, fill(empty_state, length(dots)))
 end
 
 const WALL_ANGLES = [0, pi/2, pi, 3/2 * pi]
@@ -93,6 +102,8 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
     @unpack n_dots = gm
     @unpack walls, objects = state
     new_dots = Vector{Dot}(undef, n_dots)
+    gstates = Vector{SparseMatrixCSC{Float64}}(undef, n)
+
     @inbounds for i = 1:n_dots
         facc = zeros(2) # force accumalator
         dot = objects[i]
@@ -111,9 +122,10 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
         # also do graphical update
         new_gstate = update_graphics(gm, dot, new_pos)
         new_dots[i] = update(dot, new_pos, new_vel, new_gstate)
+        gstates[i] = dot.gstate
     end
 
-    RepulsionState(walls, new_dots)
+    RepulsionState(walls, new_dots, gstates)
 end
 
 normalvec(w::Wall, pos) = w.normal
