@@ -26,11 +26,11 @@ struct Dot <: Thing
 end
 
 JSON.lower(d::Dot) = Dict(
-    radius  => d.radius,
-    mass => d.mass,
-    pos => d.pos,
-    vel => d.vel,
-    gstate => d.gstate
+    :radius  => d.radius,
+    :mass => d.mass,
+    :pos => d.pos,
+    :vel => d.vel,
+    :gstate => d.gstate
 )
 
 @with_kw struct RepulsionGM <: GenerativeModel
@@ -76,7 +76,7 @@ end
 ##Updated upstream
 function RepulsionState(gm::RepulsionGM, dots)
     walls = init_walls(gm)
-    empty_state = spzeros(dots[1].gstate)
+    empty_state = spzeros(size(dots[1].gstate))
     RepulsionState(walls, dots, fill(empty_state, length(dots)))
 end
 
@@ -102,7 +102,7 @@ function step(gm::RepulsionGM, state::RepulsionState)::RepulsionState
     @unpack n_dots = gm
     @unpack walls, objects = state
     new_dots = Vector{Dot}(undef, n_dots)
-    gstates = Vector{SparseMatrixCSC{Float64}}(undef, n)
+    gstates = Vector{SparseMatrixCSC{Float64}}(undef, n_dots)
 
     @inbounds for i = 1:n_dots
         facc = zeros(2) # force accumalator

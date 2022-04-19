@@ -40,7 +40,7 @@ class PrintLayer(nn.Module):
         return x
 
 class BetaVAE(BaseVAE):
-
+image space
     num_iter = 0 # Global static variable to keep track of iterations
 
     def __init__(self,

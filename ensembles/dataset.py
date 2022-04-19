@@ -30,65 +30,64 @@ class ObjectDataset(Dataset):
             self.manifest['n_dots']
     #loads a trial
     def __getitem__(self, idx):
-        scene = np.floor(idx/len(self))
-        time = np.floor(idx % len(self)/self.manifest['n_dots'])
-        item = idx % self.manifest['n_dots']
-        obj_path = os.path.join(self.src, str(idx+1),"serialized",
-        f"{time}_{item}.json")
-        img_path = os.path.join(self.src, str(idx+1),"images",
-        f"{time}_{item}.png")
+        n = len(self)
+        scene = np.floor(idx/n).astype(int) + 1
+        time = np.floor(idx % len(self)/self.manifest['n_dots']).astype(int) + 1
+        item = idx % self.manifest['n_dots'] + 1
+        obj_path = f"{self.src}/{scene}/serialized/{time}_{item}.json"
+        img_path = f"{self.src}/{scene}/images/{time}_{item}.png"
         image = pil_loader(img_path)
         results = []
         with open(obj_path, 'r') as f:
             obj = json.load(f)
-            for i in self.embedding_order:
-                results.append(obj[i])
-        embedding = np.flatten(results)
-        return embedding, image
+            k = 6 + len(obj['gstate'])
+            result = np.zeros(k)
+            result[0] = obj['radius']
+            result[1] = obj['mass']
+            result[2:4] = obj['pos']
+            result[4:6] = obj['vel']
+            gstate = np.asarray(obj['gstate']).flatten()
+            #embedding = np.ndarray.flatten(results).astype(np.float32)
+            result[6:] = gstate
 
-def write_ffcv_data(d: OGVAEDataset,
+
+        # results = np.asarray(results)
+        # embedding = np.ndarray.flatten(results).astype(np.float32)
+        #
+        return result, image
+
+def write_ffcv_data(d: ObjectDataset,
                     path: str,
+                    emb_kwargs: dict,
                     img_kwargs: dict,
-                    og_kwargs: dict,
                     w_kwargs: dict) -> None:
     writer = DatasetWriter(path,
-                           { 'image': RGBImageField(**img_kwargs),
-                             'og': NDArrayField(**og_kwargs)},
+                           {'emb': NDArrayField(**emb_kwargs),
+                            'image': RGBImageField(**img_kwargs)},
                            **w_kwargs)
     writer.from_indexed_dataset(d)
 
-def img_pipeline(mu, sd) -> List[Operation]OGVAE:
+def img_pipeline(mu, sd) -> List[Operation]:
     return [SimpleRGBImageDecoder(),
-            # NormalizeImage(mu, sd, np.float16),
+            NormalizeImage(mu, sd, np.float32),
             ToTensor(),
-            ToTorchImage(),
+            ToTorchImage(convert_back_int16 =False),
             Convert(torch.float32),
             ]
 
-def og_pipeline() -> List[Operation]:
+def object_pipeline() -> List[Operation]:
     return [NDArrayDecoder(),
             Convert(torch.float32),
             ToTensor()]
 
-def ogvae_loader(path: str, device,  **kwargs) -> Loader:
+def object_loader(path: str, device,  **kwargs) -> Loader:
     with open(path + '_manifest.json', 'r') as f:
         manifest = json.load(f)
-
+    mu = np.zeros(3)
+    sd = np.array([255, 255, 255])
     l =  Loader(path + '.beton',
-                pipelines= {'image' : img_pipeline(manifest['img_mu'],
-                                                   manifest['img_sd']) +
+                pipelines= {'emb' : object_pipeline() +
                                       [ToDevice(device)],
-                            'og': None},
-                **kwargs)
-    return l
-
-def ogdecoder_loader(path: str , **kwargs) -> Loader:
-    with open(path + '_manifest.json', 'r') as f:
-        manifest = json.load(f)
-
-    l =  Loader(path + '.beton',
-                pipelines= {'image' : img_pipeline(manifest['img_mu'],
-                                                   manifest['img_sd']),
-                            'og'    : og_pipeline()},
+                            'image': None},
                 **kwargs)
     return l
