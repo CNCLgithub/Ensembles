@@ -40,21 +40,33 @@ class ObjectDataset(Dataset):
         results = []
         with open(obj_path, 'r') as f:
             obj = json.load(f)
-            k = 6 + len(obj['gstate'])
-            result = np.zeros(k)
-            result[0] = obj['radius']
-            result[1] = obj['mass']
-            result[2:4] = obj['pos']
-            result[4:6] = obj['vel']
-            gstate = np.asarray(obj['gstate']).flatten()
+            # k = 6 + len(obj['gstate'])
+            # result = np.zeros(k)
+            # result[0] = obj['radius']
+            # result[1] = obj['mass']
+            # result[2:4] = obj['pos']
+            # result[4:6] = obj['vel']
+            #result[6:] = gstate
+            gstate = np.array(obj['gstate']).flatten()
+            results.append(obj['radius'])
+            results.append(obj['mass'])
+            results.extend(obj['pos'])
+            results.extend(obj['vel'])
+            print(len(gstate))
+            results.extend(gstate)
+            print(len(results))
+            results=np.array(results, dtype="float32")
+            print(results.dtype)
+
+
             #embedding = np.ndarray.flatten(results).astype(np.float32)
-            result[6:] = gstate
+
 
 
         # results = np.asarray(results)
         # embedding = np.ndarray.flatten(results).astype(np.float32)
         #
-        return result, image
+        return results, image
 
 def write_ffcv_data(d: ObjectDataset,
                     path: str,
