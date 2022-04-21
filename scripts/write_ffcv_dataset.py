@@ -25,9 +25,12 @@ def main():
     dpath = os.path.join('/spaths/datasets', args.src)
     d = ObjectDataset(dpath)
 
-    img_kwargs = dict()
-    emb_kwargs = dict(
-        shape = (128*128+4,),
+    gs_kwargs = dict(
+        shape = (128,128),
+        dtype = np.dtype('float32')
+    )
+    dk_kwargs = dict(
+        shape = (6,),
         dtype = np.dtype('float32')
     )
     writer_kwargs = dict(
@@ -35,7 +38,7 @@ def main():
     )
     path = dpath + '.beton'
 
-    write_ffcv_data(d, path, emb_kwargs, img_kwargs, writer_kwargs)
+    write_ffcv_data(d, path, dk_kwargs, gs_kwargs, writer_kwargs)
 
 
 # TODO: compute img stats

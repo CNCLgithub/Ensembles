@@ -11,8 +11,8 @@ function rep_test()
     gm = RepulsionGM(n_dots = 6,
                     area_width = 600.0,
                     area_height = 600.0,
-                    img_width = 512,
-                    img_height = 512,
+                    img_width = 128,
+                    img_height = 128,
                     dot_repulsion= 1.)
     rdgp = RepulsionDGP(trials = 2,
                         k=240,

@@ -1,4 +1,5 @@
 using UnicodePlots
+using Images
 
 
 export DGP, RepulsionDGP, dgp
@@ -23,7 +24,7 @@ function distances(objects::Vector{Dot})
     # initialize distance matrix
     dmat = zeros(n, n)
     @inbounds for i = 1:n, j = 1:n
-        # 0 distance if same object
+        # 0 distance if PNG_COLOR_TYPE_GRAYsame object
         i === j  && continue
         # otherwise l2 distance
         i_pos = objects[i].pos
@@ -58,6 +59,7 @@ function write_states(gm::RepulsionGM, states::Vector{RepulsionState}, path::Str
             # see `write_states` above and the file `test/repulsion.jl`
             obj = states[i].objects[j]
             gstate = states[i].gstate[j]
+            #replacing gstate of obj to be the old gstate
             obj = update(obj, obj.pos, obj.vel, gstate)
             json_state_path = "$(state_path)/$(i)_$(j).json"
             open(json_state_path, "w") do f
@@ -102,6 +104,8 @@ function write_graphics(gm::RepulsionGM, states::Vector{RepulsionState}, path::S
         clamp!(gstate,0.,1.)
         scene_file = "$(img_path)/$(i).png"
         save(scene_file, gstate)
+
+
 
     end
     return nothing

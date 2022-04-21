@@ -2,7 +2,7 @@ import os
 import json
 import torch
 import numpy as np
-# from PIL import Image
+from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.datasets.folder import pil_loader
@@ -32,60 +32,46 @@ class ObjectDataset(Dataset):
     def __getitem__(self, idx):
         n = len(self)
         scene = np.floor(idx/n).astype(int) + 1
-        time = np.floor(idx % len(self)/self.manifest['n_dots']).astype(int) + 1
+        nk = self.manifest['k'] * self.manifest['n_dots']
+        time = np.floor((idx % nk)/self.manifest['n_dots']).astype(int) + 1
         item = idx % self.manifest['n_dots'] + 1
         obj_path = f"{self.src}/{scene}/serialized/{time}_{item}.json"
         img_path = f"{self.src}/{scene}/images/{time}_{item}.png"
-        image = pil_loader(img_path)
-        results = []
+        # gstate = np.asarray(pil_loader(img_path))
+        gstate = np.asarray(Image.open(img_path).convert('L')).astype('float32')
+        #print(np.squeeze(gstate, axis=2).shape)
         with open(obj_path, 'r') as f:
             obj = json.load(f)
-            # k = 6 + len(obj['gstate'])
-            # result = np.zeros(k)
-            # result[0] = obj['radius']
-            # result[1] = obj['mass']
-            # result[2:4] = obj['pos']
-            # result[4:6] = obj['vel']
-            #result[6:] = gstate
-            gstate = np.array(obj['gstate']).flatten()
-            results.append(obj['radius'])
-            results.append(obj['mass'])
-            results.extend(obj['pos'])
-            results.extend(obj['vel'])
-            print(len(gstate))
-            results.extend(gstate)
-            print(len(results))
-            results=np.array(results, dtype="float32")
-            print(results.dtype)
+            k = 6
+            dk_embedding = np.zeros(k)
+            dk_embedding[0] = obj['radius']
+            dk_embedding[1] = obj['mass']
+            dk_embedding[2:4] = obj['pos']
+            dk_embedding[4:6] = obj['vel']
+            old_gstate = np.array(obj['gstate']).astype(np.float32)
+            dk_embedding = dk_embedding.astype(np.float32)
 
-
-            #embedding = np.ndarray.flatten(results).astype(np.float32)
-
-
-
-        # results = np.asarray(results)
-        # embedding = np.ndarray.flatten(results).astype(np.float32)
-        #
-        return results, image
+        return dk_embedding, old_gstate, gstate
 
 def write_ffcv_data(d: ObjectDataset,
                     path: str,
-                    emb_kwargs: dict,
-                    img_kwargs: dict,
+                    dk_kwargs: dict,
+                    gs_kwargs: dict,
                     w_kwargs: dict) -> None:
     writer = DatasetWriter(path,
-                           {'emb': NDArrayField(**emb_kwargs),
-                            'image': RGBImageField(**img_kwargs)},
+                           {'dk': NDArrayField(**dk_kwargs),
+                           'old_gstate' : NDArrayField(**gs_kwargs),
+                            'gstate': NDArrayField(**gs_kwargs)},
                            **w_kwargs)
     writer.from_indexed_dataset(d)
 
-def img_pipeline(mu, sd) -> List[Operation]:
-    return [SimpleRGBImageDecoder(),
-            NormalizeImage(mu, sd, np.float32),
-            ToTensor(),
-            ToTorchImage(convert_back_int16 =False),
-            Convert(torch.float32),
-            ]
+# def img_pipeline(mu, sd) -> List[Operation]:
+#     return [SimpleRGBImageDecoder(),
+#             NormalizeImage(mu, sd, np.float32),
+#             ToTensor(),
+#             ToTorchImage(convert_back_int16 =False),
+#             Convert(torch.float32),
+#             ]
 
 def object_pipeline() -> List[Operation]:
     return [NDArrayDecoder(),
@@ -95,11 +81,11 @@ def object_pipeline() -> List[Operation]:
 def object_loader(path: str, device,  **kwargs) -> Loader:
     with open(path + '_manifest.json', 'r') as f:
         manifest = json.load(f)
-    mu = np.zeros(3)
-    sd = np.array([255, 255, 255])
     l =  Loader(path + '.beton',
-                pipelines= {'emb' : object_pipeline() +
+                pipelines= {'dk' : object_pipeline() +
                                       [ToDevice(device)],
-                            'image': None},
+                            'ogs' : object_pipeline() +
+                                      [ToDevice(device)],
+                            'gs': None},
                 **kwargs)
     return l

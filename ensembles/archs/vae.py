@@ -44,54 +44,73 @@ image space
     num_iter = 0 # Global static variable to keep track of iterations
 
     def __init__(self,
-                 in_channels: int,
                  latent_dim: int,
-                 hidden_dims: List = None,
                  beta: int = 4,
-                 gamma:float = 1000.,
-                 max_capacity: int = 25,
-                 Capacity_max_iter: int = 1e5,
-                 loss_type:str = 'B',
                  **kwargs) -> None:
         super(BetaVAE, self).__init__()
 
         self.latent_dim = latent_dim
         self.beta = beta
-        self.gamma = gamma
-        self.loss_type = loss_type
-        self.C_max = torch.Tensor([max_capacity])
-        self.C_stop_iter = Capacity_max_iter
 
-        modules = []
-        if hidden_dims is None:
-            hidden_dims = [32, 32, 64, 128, 256, 256]
+        ogs_modules = []
+
+        hidden_dims = [64, 64]
+        in_channels = 1
 
         # Build Encoder
         for h_dim in hidden_dims:
-            modules.append(
+            ogs_modules.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels, out_channels=h_dim,
                               kernel_size= 4, stride= 2, padding  = 1),
-                    # PrintLayer(),
+                    PrintLayer(),
                     nn.BatchNorm2d(h_dim),
                     nn.LeakyReLU())
             )
             in_channels = h_dim
 
-        self.encoder = nn.Sequential(*modules)
-        self.fc_mu = nn.Linear(hidden_dims[-1] * 16, latent_dim)
-        self.fc_var = nn.Linear(hidden_dims[-1] * 16, latent_dim)
+        self.ogs_encoder = nn.Sequential(*ogs_modules)
+
+        self.dk_encoder = nn.Sequential(
+            [
+                nn.Linear(6,128),
+                nn.LeakyReLU(),
+                nn.Linear(latent_dim ,latent_dim),
+                nn.LeakyReLU()
+            ]
+        )
+
+        self.encoder = nn.Sequential(
+            [
+                nn.Linear(256,128),
+                nn.LeakyReLU(),
+                nn.Linear(latent_dim,latent_dim),
+                nn.LeakyReLU()
+            ]
+        )
+
+
+
+        self.fc_mu = nn.Linear(latent_dim, latent_dim)
+        self.fc_var = nn.Linear(latent_dim, latent_dim)
 
 
         # Build Decoder
-        modules = []
+        ogs_modules = []
 
-        self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1] * 16)
+        self.decoder = nn.Sequential(
+            [
+                nn.Linear(latent_dim,latent_dim),
+                nn.LeakyReLU(),
+                nn.Linear(latent_dim,256),
+                nn.LeakyReLU()
+            ]
+        )
 
         hidden_dims.reverse()
 
         for i in range(len(hidden_dims) - 1):
-            modules.append(
+            ogs_modules.append(
                 nn.Sequential(
                     nn.ConvTranspose2d(hidden_dims[i],
                                        hidden_dims[i + 1],
@@ -103,26 +122,19 @@ image space
                     nn.LeakyReLU())
             )
 
+        self.ogs_decoder = nn.Sequential(*ogs_modules)
+
+        self.dk_decoder = nn.Sequential(
+            [
+                nn.Linear(6,128),
+                nn.LeakyReLU(),
+                nn.Linear(128,128),
+                nn.LeakyReLU()
+            ]
+        )
 
 
-        self.decoder = nn.Sequential(*modules)
-
-        self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(hidden_dims[-1],
-                               hidden_dims[-1],
-                               kernel_size=3,
-                               stride=2,
-                               padding=1,
-                               output_padding=1),
-            # PrintLayer(),
-            nn.BatchNorm2d(hidden_dims[-1]),
-            nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels= 3,
-                      kernel_size= 3, padding= 1),
-            # PrintLayer(),
-            nn.LeakyReLU())
-
-    def encode(self, input: Tensor) -> List[Tensor]:
+    def encode(self, dk: Tensor, ogs: Tensor) -> List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
