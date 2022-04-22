@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from abc import abstractmethod
 
-from . pytypes import *
+from ensembles.pytypes import *
 
 class BaseVAE(nn.Module):
 
@@ -29,7 +29,6 @@ class BaseVAE(nn.Module):
     @abstractmethod
     def loss_function(self, *inputs: Any, **kwargs) -> Tensor:
         pass
-
 class PrintLayer(nn.Module):
     def __init__(self):
         super(PrintLayer, self).__init__()
@@ -40,7 +39,6 @@ class PrintLayer(nn.Module):
         return x
 
 class BetaVAE(BaseVAE):
-image space
     num_iter = 0 # Global static variable to keep track of iterations
 
     def __init__(self,
@@ -54,7 +52,7 @@ image space
 
         ogs_modules = []
 
-        hidden_dims = [64, 64]
+        hidden_dims = [16, 32, 64, 64, 64, 64]
         in_channels = 1
 
         # Build Encoder
@@ -69,24 +67,20 @@ image space
             )
             in_channels = h_dim
 
-        self.ogs_encoder = nn.Sequential(*ogs_modules)
+        self.ogs_encoder = nn.Sequential(*ogs_modules, nn.Flatten())
 
         self.dk_encoder = nn.Sequential(
-            [
-                nn.Linear(6,128),
+                nn.Linear(6,latent_dim),
                 nn.LeakyReLU(),
                 nn.Linear(latent_dim ,latent_dim),
                 nn.LeakyReLU()
-            ]
         )
 
         self.encoder = nn.Sequential(
-            [
-                nn.Linear(256,128),
+                nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU(),
                 nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU()
-            ]
         )
 
 
@@ -99,12 +93,10 @@ image space
         ogs_modules = []
 
         self.decoder = nn.Sequential(
-            [
                 nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU(),
-                nn.Linear(latent_dim,256),
+                nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU()
-            ]
         )
 
         hidden_dims.reverse()
@@ -117,7 +109,7 @@ image space
                                        kernel_size=4,
                                        stride = 2,
                                        padding=1),
-                    # PrintLayer(),
+                    PrintLayer(),
                     nn.BatchNorm2d(hidden_dims[i + 1]),
                     nn.LeakyReLU())
             )
@@ -125,12 +117,10 @@ image space
         self.ogs_decoder = nn.Sequential(*ogs_modules)
 
         self.dk_decoder = nn.Sequential(
-            [
-                nn.Linear(6,128),
+                nn.Linear(6,latent_dim),
                 nn.LeakyReLU(),
-                nn.Linear(128,128),
+                nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU()
-            ]
         )
 
 
@@ -141,8 +131,13 @@ image space
         :param input: (Tensor) Input tensor to encoder [N x C x H x W]
         :return: (Tensor) List of latent codes
         """
-        result = self.encoder(input)
-        result = torch.flatten(result, start_dim=1)
+        ogs=ogs.unsqueeze(1)
+        dke = self.dk_encoder(dk)
+        ogse = self.ogs_encoder(ogs)
+        print(ogse.shape)
+        result = torch.cat((dke, ogse), 1)
+        result = self.encoder(result)
+        #result = torch.flatten(result, start_dim=1)
         # Split the result into mu and var components
         # of the latent Gaussian distribution
         # print(result.shape)
@@ -152,16 +147,12 @@ image space
         return [mu, log_var]
 
     def decode(self, z: Tensor) -> Tensor:
-        # print(z.shape)
-        result = self.decoder_input(z)
-        # print(result.shape)
-        # print('decode view')
-        result = result.view(z.shape[0], -1, 4, 4)
-        # result = result.unsqueeze(-1)
-        # print(result.shape)
-        result = self.decoder(result)
-        result = self.final_layer(result)
-        return result
+        result = self.decoder(z)
+        dkd, ogd = torch.split(result, self.latent_dim, 1)
+        dkd = self.dk_decoder(dkd)
+        ogd = self.ogs_decoder(ogd)
+        #result = self.final_layer(result)
+        return (dkd, ogd)
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         """
@@ -175,8 +166,8 @@ image space
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, input: Tensor, **kwargs) -> Tensor:
-        mu, log_var = self.encode(input)
+    def forward(self, dk: Tensor, ogs: Tensor) -> Tensor:
+        mu, log_var = self.encode(dk, ogs)
         z = self.reparameterize(mu, log_var)
         return  [self.decode(z), input, mu, log_var]
 
@@ -193,15 +184,7 @@ image space
         recons_loss =F.mse_loss(recons, input)
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
-
-        if self.loss_type == 'H': # https://openreview.net/forum?id=Sy2fzU9gl
-            loss = recons_loss + self.beta * kld_weight * kld_loss
-        elif self.loss_type == 'B': # https://arxiv.org/pdf/1804.03599.pdf
-            self.C_max = self.C_max.to(input.device)
-            C = torch.clamp(self.C_max/self.C_stop_iter * self.num_iter, 0, self.C_max.data[0])
-            loss = recons_loss + self.gamma * kld_weight* (kld_loss - C).abs()
-        else:
-            raise ValueError('Undefined loss type.')
+        loss = recons_loss + self.beta * kld_weight * kld_loss
 
         return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':kld_loss}
 

@@ -60,8 +60,8 @@ def write_ffcv_data(d: ObjectDataset,
                     w_kwargs: dict) -> None:
     writer = DatasetWriter(path,
                            {'dk': NDArrayField(**dk_kwargs),
-                           'old_gstate' : NDArrayField(**gs_kwargs),
-                            'gstate': NDArrayField(**gs_kwargs)},
+                           'ogs' : NDArrayField(**gs_kwargs),
+                            'gs': NDArrayField(**gs_kwargs)},
                            **w_kwargs)
     writer.from_indexed_dataset(d)
 
@@ -75,8 +75,8 @@ def write_ffcv_data(d: ObjectDataset,
 
 def object_pipeline() -> List[Operation]:
     return [NDArrayDecoder(),
-            Convert(torch.float32),
-            ToTensor()]
+            ToTensor(),
+            Convert(torch.float32)]
 
 def object_loader(path: str, device,  **kwargs) -> Loader:
     with open(path + '_manifest.json', 'r') as f:
