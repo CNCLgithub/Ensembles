@@ -13,13 +13,14 @@ function rep_test()
                     area_height = 600.0,
                     img_width = 128,
                     img_height = 128,
-                    dot_repulsion= 1.)
-    rdgp = RepulsionDGP(trials = 10,
-                        k=120,
+                    dot_repulsion= 1.,
+                    outer_f=10.0)
+    rdgp = RepulsionDGP(trials = 3,
+                        k=60,
                         max_distance=Inf,
                         min_distance=-Inf,
                         tries=1e7,
-                        out_dir = "/spaths/datasets/pilot")
+                        out_dir = "/spaths/datasets/pilot_test")
     m = Dict(:n_dots=>gm.n_dots,
     :area_width=>gm.area_width,
     :area_height=>gm.area_height,
@@ -28,7 +29,7 @@ function rep_test()
     :trials=>rdgp.trials,
     :k=>rdgp.k)
 
-    mpath = "/spaths/datasets/pilot_manifest.json"
+    mpath = "$(rdgp.out_dir)_manifest.json"
     open(mpath, "w") do f
         write(f, JSON.json(m))
     end

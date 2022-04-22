@@ -38,7 +38,7 @@ class ObjectDataset(Dataset):
         obj_path = f"{self.src}/{scene}/serialized/{time}_{item}.json"
         img_path = f"{self.src}/{scene}/images/{time}_{item}.png"
         # gstate = np.asarray(pil_loader(img_path))
-        gstate = np.asarray(Image.open(img_path).convert('L')).astype('float32')
+        gstate = np.asarray(Image.open(img_path).convert('L')).astype('float32')/255.0
         #print(np.squeeze(gstate, axis=2).shape)
         with open(obj_path, 'r') as f:
             obj = json.load(f)
@@ -46,8 +46,8 @@ class ObjectDataset(Dataset):
             dk_embedding = np.zeros(k)
             dk_embedding[0] = obj['radius']
             dk_embedding[1] = obj['mass']
-            dk_embedding[2:4] = obj['pos']
-            dk_embedding[4:6] = obj['vel']
+            dk_embedding[2:4] = np.asarray(obj['pos'])/300.0
+            dk_embedding[4:6] = np.asarray(obj['vel'])/100.0
             old_gstate = np.array(obj['gstate']).astype(np.float32)
             dk_embedding = dk_embedding.astype(np.float32)
 

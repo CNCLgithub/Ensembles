@@ -61,7 +61,7 @@ class BetaVAE(BaseVAE):
                 nn.Sequential(
                     nn.Conv2d(in_channels, out_channels=h_dim,
                               kernel_size= 4, stride= 2, padding  = 1),
-                    PrintLayer(),
+                    #PrintLayer(),
                     nn.BatchNorm2d(h_dim),
                     nn.LeakyReLU())
             )
@@ -77,7 +77,7 @@ class BetaVAE(BaseVAE):
         )
 
         self.encoder = nn.Sequential(
-                nn.Linear(latent_dim,latent_dim),
+                nn.Linear(2*latent_dim,latent_dim),
                 nn.LeakyReLU(),
                 nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU()
@@ -95,9 +95,10 @@ class BetaVAE(BaseVAE):
         self.decoder = nn.Sequential(
                 nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU(),
-                nn.Linear(latent_dim,latent_dim),
+                nn.Linear(latent_dim, 2*latent_dim),
                 nn.LeakyReLU()
         )
+
 
         hidden_dims.reverse()
 
@@ -109,17 +110,24 @@ class BetaVAE(BaseVAE):
                                        kernel_size=4,
                                        stride = 2,
                                        padding=1),
-                    PrintLayer(),
+                    #PrintLayer(),
                     nn.BatchNorm2d(hidden_dims[i + 1]),
                     nn.LeakyReLU())
             )
 
-        self.ogs_decoder = nn.Sequential(*ogs_modules)
+        self.ogs_decoder = nn.Sequential(*ogs_modules,
+                           nn.Conv2d(hidden_dims[-1], out_channels= 4,
+                                     kernel_size= 3, padding= 1),
+                           #nn.LeakyReLU()
+                           nn.Sigmoid()
+                                     #PrintLayer()
+                                     )
+
 
         self.dk_decoder = nn.Sequential(
-                nn.Linear(6,latent_dim),
-                nn.LeakyReLU(),
                 nn.Linear(latent_dim,latent_dim),
+                nn.LeakyReLU(),
+                nn.Linear(latent_dim,6),
                 nn.LeakyReLU()
         )
 
@@ -134,8 +142,8 @@ class BetaVAE(BaseVAE):
         ogs=ogs.unsqueeze(1)
         dke = self.dk_encoder(dk)
         ogse = self.ogs_encoder(ogs)
-        print(ogse.shape)
         result = torch.cat((dke, ogse), 1)
+        #print(result.shape)
         result = self.encoder(result)
         #result = torch.flatten(result, start_dim=1)
         # Split the result into mu and var components
@@ -148,9 +156,13 @@ class BetaVAE(BaseVAE):
 
     def decode(self, z: Tensor) -> Tensor:
         result = self.decoder(z)
+        #print(result.shape)
+        #print(torch.split(result, self.latent_dim, 1))
         dkd, ogd = torch.split(result, self.latent_dim, 1)
+        ogd = ogd.view((z.shape[0], -1, 2, 2))
         dkd = self.dk_decoder(dkd)
         ogd = self.ogs_decoder(ogd)
+        ogd=ogd.view(z.shape[0],128,128)
         #result = self.final_layer(result)
         return (dkd, ogd)
 
@@ -169,19 +181,14 @@ class BetaVAE(BaseVAE):
     def forward(self, dk: Tensor, ogs: Tensor) -> Tensor:
         mu, log_var = self.encode(dk, ogs)
         z = self.reparameterize(mu, log_var)
-        return  [self.decode(z), input, mu, log_var]
+        return  [*self.decode(z), dk, ogs, mu, log_var]
 
     def loss_function(self,
-                      *args,
+                      recons_dk, recons_ogs, dk, ogs, mu, log_var,
                       **kwargs) -> dict:
-        self.num_iter += 1
-        recons = args[0]
-        input = args[1]
-        mu = args[2]
-        log_var = args[3]
         kld_weight = kwargs['M_N']  # Account for the minibatch samples from the dataset
-
-        recons_loss =F.mse_loss(recons, input)
+        #recons_loss =F.mse_loss(recons_dk, dk)/(dk.shape[-1]) + F.mse_loss(recons_ogs, ogs)/(ogs.shape[-1] * ogs.shape[-2])
+        recons_loss =F.mse_loss(recons_dk, dk)+ F.mse_loss(recons_ogs, ogs)
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         loss = recons_loss + self.beta * kld_weight * kld_loss
