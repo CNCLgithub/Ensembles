@@ -18,6 +18,10 @@ archs = {
     'BetaVAE' : BetaVAE,
 }
 
+def const_init(model, fill=0.0):
+    for name, param in model.named_parameters():
+        param.data.fill_(fill)
+
 def main():
     parser = argparse.ArgumentParser(description='Generic runner for VAE models')
     parser.add_argument('config', type = str,
@@ -36,6 +40,8 @@ def main():
 
     if config['mode'] == 'og_vae':
         arch = archs[config['model_params']['name']](**config['model_params'])
+        #const_init(arch)
+        #arch.train()
         task = SymEmbedding(arch,  config['exp_params'])
         loader = object_loader
     else:
