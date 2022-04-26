@@ -70,7 +70,7 @@ class BetaVAE(BaseVAE):
         self.ogs_encoder = nn.Sequential(*ogs_modules, nn.Flatten())
 
         self.dk_encoder = nn.Sequential(
-                nn.Linear(6,latent_dim),
+                nn.Linear(20,latent_dim),
                 nn.LeakyReLU(),
                 nn.Linear(latent_dim ,latent_dim),
                 nn.LeakyReLU()
@@ -127,27 +127,24 @@ class BetaVAE(BaseVAE):
         self.dk_decoder = nn.Sequential(
                 nn.Linear(latent_dim,latent_dim),
                 nn.LeakyReLU(),
-                nn.Linear(latent_dim,6),
-                nn.LeakyReLU()
+                nn.Linear(latent_dim, 20),
+                nn.Tanh()
         )
 
 
-    def encode(self, dk: Tensor, ogs: Tensor) -> List[Tensor]:
+    def encode(self, dk: Tensor) -> List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
         :param input: (Tensor) Input tensor to encoder [N x C x H x W]
         :return: (Tensor) List of latent codes
         """
-        ogs=ogs.unsqueeze(1)
-        dke = self.dk_encoder(dk)
-        ogse = self.ogs_encoder(ogs)
-        result = torch.cat((dke, ogse), 1)
+        #ogs=ogs.unsqueeze(1)
+        print(type(dk))
+        #dke = self.dk_encoder(dk)
+        #ogse = self.ogs_encoder(ogs)
+        #result = torch.cat((dke, ogse), 1)
         #print(result.shape)
-        result = self.encoder(result)
-        #result = torch.flatten(result, start_dim=1)
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
         # print(result.shape)
         mu = self.fc_mu(result)
         log_var = self.fc_var(result)
@@ -155,16 +152,15 @@ class BetaVAE(BaseVAE):
         return [mu, log_var]
 
     def decode(self, z: Tensor) -> Tensor:
-        result = self.decoder(z)
         #print(result.shape)
         #print(torch.split(result, self.latent_dim, 1))
-        dkd, ogd = torch.split(result, self.latent_dim, 1)
-        ogd = ogd.view((z.shape[0], -1, 2, 2))
-        dkd = self.dk_decoder(dkd)
-        ogd = self.ogs_decoder(ogd)
-        ogd=ogd.view(z.shape[0],128,128)
+        #dkd, ogd = torch.split(result, self.latent_dim, 1)
+        #ogd = ogd.view((z.shape[0], -1, 2, 2))
+        dkd = self.dk_decoder(z)
+        #ogd = self.ogs_decoder(ogd)
+        #ogd=ogd.view(z.shape[0],128,128)
         #result = self.final_layer(result)
-        return (dkd, ogd)
+        return dkd
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         """
@@ -178,17 +174,17 @@ class BetaVAE(BaseVAE):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(self, dk: Tensor, ogs: Tensor) -> Tensor:
-        mu, log_var = self.encode(dk, ogs)
+    def forward(self, dk: Tensor) -> Tensor:
+        mu, log_var = self.encode(dk)
         z = self.reparameterize(mu, log_var)
-        return  [*self.decode(z), dk, ogs, mu, log_var]
+        return  [*self.decode(z), dk, mu, log_var]
 
     def loss_function(self,
-                      recons_dk, recons_ogs, dk, ogs, mu, log_var,
+                      recons_dk, dk, mu, log_var,
                       **kwargs) -> dict:
         kld_weight = kwargs['M_N']  # Account for the minibatch samples from the dataset
         #recons_loss =F.mse_loss(recons_dk, dk)/(dk.shape[-1]) + F.mse_loss(recons_ogs, ogs)/(ogs.shape[-1] * ogs.shape[-2])
-        recons_loss =F.mse_loss(recons_dk, dk)+ F.mse_loss(recons_ogs, ogs)
+        recons_loss =F.mse_loss(recons_dk, dk)
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
         loss = recons_loss + self.beta * kld_weight * kld_loss
