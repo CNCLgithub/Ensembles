@@ -28,6 +28,7 @@ class ObjectDataset(Dataset):
     def __len__(self):
         return self.manifest['trials'] * self.manifest['k'] * \
             self.manifest['n_dots']
+
     #loads a trial
     def __getitem__(self, idx):
         n = len(self)
@@ -42,16 +43,33 @@ class ObjectDataset(Dataset):
         #print(np.squeeze(gstate, axis=2).shape)
         with open(obj_path, 'r') as f:
             obj = json.load(f)
-            k = 6
-            dk_embedding = np.zeros(k)
-            dk_embedding[0] = obj['radius']
-            dk_embedding[1] = obj['mass']
-            dk_embedding[2:4] = np.asarray(obj['pos'])/300.0
-            dk_embedding[4:6] = np.asarray(obj['vel'])/100.0
-            old_gstate = np.array(obj['gstate']).astype(np.float32)
-            dk_embedding = dk_embedding.astype(np.float32)
 
-        return dk_embedding, old_gstate, gstate
+        #k = 2 (size and mass) + (4(position, velocity) * 5)
+        k = 20
+        dk_embedding = []
+        #dk_embedding[0] = obj['radius']
+        #dk_embedding[1] = obj['mass']
+        for i in range(time-5,time):
+            obj_path = f"{self.src}/{scene}/serialized/{i+1}_{item}.json"
+            if i<0:
+                obj_i = obj
+            else:
+                with open(obj_path, 'r') as f:
+                    obj_i = json.load(f)
+
+            dk_embedding.append(np.asarray(obj_i['pos'])/300.0)
+            dk_embedding.append(np.asarray(obj_i['vel'])/100.0)
+
+
+        #for loop time -5 : time, if time <0, just copy time t
+        #dk_embedding[2:4] = np.asarray(obj['pos'])/300.0
+        #dk_embedding[4:6] = np.asarray(obj['vel'])/100.0
+            #old_gstate = np.array(obj['gstate']).astype(np.float32)
+        dk_embedding = np.asarray(dk_embedding)
+        dk_embedding = np.ndarray.flatten(dk_embedding).astype(np.float32)
+        return dk_embedding, gstate
+
+    #    return dk_embedding, old_gstate, gstate
 
 def write_ffcv_data(d: ObjectDataset,
                     path: str,
@@ -60,7 +78,7 @@ def write_ffcv_data(d: ObjectDataset,
                     w_kwargs: dict) -> None:
     writer = DatasetWriter(path,
                            {'dk': NDArrayField(**dk_kwargs),
-                           'ogs' : NDArrayField(**gs_kwargs),
+                           #'ogs' : NDArrayField(**gs_kwargs),
                             'gs': NDArrayField(**gs_kwargs)},
                            **w_kwargs)
     writer.from_indexed_dataset(d)
@@ -84,8 +102,8 @@ def object_loader(path: str, device,  **kwargs) -> Loader:
     l =  Loader(path + '.beton',
                 pipelines= {'dk' : object_pipeline() +
                                       [ToDevice(device)],
-                            'ogs' : object_pipeline() +
-                                      [ToDevice(device)],
+                            #'ogs' : object_pipeline() +
+                                      #[ToDevice(device)],
                             'gs': None},
                 **kwargs)
     return l
