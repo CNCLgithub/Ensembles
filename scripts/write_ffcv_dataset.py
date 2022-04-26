@@ -30,7 +30,7 @@ def main():
         dtype = np.dtype('float32')
     )
     dk_kwargs = dict(
-        shape = (6,),
+        shape = (20,),
         dtype = np.dtype('float32')
     )
     writer_kwargs = dict(
