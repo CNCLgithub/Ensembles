@@ -28,20 +28,19 @@ class SymEmbedding(pl.LightningModule):
         return self.model(dk)
 
     def training_step(self, batch, batch_idx, optimizer_idx = 0):
-        dk= batch
+        dk= batch[0]
         results = self.forward(dk)
         train_loss = self.model.loss_function(*results,
                                               M_N = self.params['kld_weight'], #al_img.shape[0]/ self.num_train_imgs,
                                               optimizer_idx=optimizer_idx,
                                               batch_idx = batch_idx)
-
         self.log_dict({key: val.item() for key, val in train_loss.items()}, sync_dist=True)
 
         return train_loss['loss']
 
     def validation_step(self, batch, batch_idx, optimizer_idx = 0):
         #dk, ogs = batch
-        dk = batch
+        dk = batch[0]
         print("validation step")
         print(type(self.forward(dk)))
         results = self.forward(dk)
@@ -49,7 +48,6 @@ class SymEmbedding(pl.LightningModule):
                                             M_N = 1.0, #real_img.shape[0]/ self.num_val_imgs,
                                             optimizer_idx = optimizer_idx,
                                             batch_idx = batch_idx)
-
 
 
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
@@ -92,7 +90,7 @@ class SymEmbedding(pl.LightningModule):
                                lr=self.params['LR'],
                                weight_decay=self.params['weight_decay'])
         optims.append(optimizer)
-        if self.params['scheduler_gamma'] is not None:
+        if self.params['scheduler_garesultmma'] is not None:
             scheduler = optim.lr_scheduler.ExponentialLR(optims[0],
                                                          gamma = self.params['scheduler_gamma'])
             scheds.append(scheduler)

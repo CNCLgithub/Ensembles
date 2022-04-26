@@ -75,7 +75,6 @@ class BetaVAE(BaseVAE):
                 nn.Linear(latent_dim ,latent_dim),
                 nn.LeakyReLU()
         )
-
         self.encoder = nn.Sequential(
                 nn.Linear(2*latent_dim,latent_dim),
                 nn.LeakyReLU(),
@@ -140,14 +139,14 @@ class BetaVAE(BaseVAE):
         :return: (Tensor) List of latent codes
         """
         #ogs=ogs.unsqueeze(1)
-        print(type(dk))
-        #dke = self.dk_encoder(dk)
+        #print(type(dk))
+        dke = self.dk_encoder(dk)
         #ogse = self.ogs_encoder(ogs)
         #result = torch.cat((dke, ogse), 1)
         #print(result.shape)
         # print(result.shape)
-        mu = self.fc_mu(result)
-        log_var = self.fc_var(result)
+        mu = self.fc_mu(dke)
+        log_var = self.fc_var(dke)
 
         return [mu, log_var]
 
