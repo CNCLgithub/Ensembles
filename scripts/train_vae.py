@@ -11,11 +11,14 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.plugins import DDPPlugin
 
 from ensembles.archs.vae import BetaVAE
+from ensembles.archs.decoder import Decoder
+from ensembles.tasks.graphics import Graphics
 from ensembles.tasks.sym_embedding import SymEmbedding
-from ensembles.dataset import object_loader
+from ensembles.dataset import object_loader, graphics_loader
 
 archs = {
     'BetaVAE' : BetaVAE,
+    'Decoder' : Decoder,
 }
 
 def const_init(model, fill=0.0):
@@ -38,12 +41,24 @@ def main():
     # For reproducibility
     seed_everything(config['exp_params']['manual_seed'], True)
 
-    if config['mode'] == 'og_vae':
+    if config['mode'] == 'sym_embedding':
         arch = archs[config['model_params']['name']](**config['model_params'])
         #const_init(arch)
-        #arch.train()
+        arch.train()
         task = SymEmbedding(arch,  config['exp_params'])
         loader = object_loader
+    elif config['mode'] == 'graphics':
+        decoder_arch = archs[config['model_params']['name']](**config['model_params'])
+        vae_arch = archs[config['vae_params']['name']](**config['vae_params'])
+        # checkpoint = torch.load(config['vae_chkpt'])
+        # state_dict = {k.replace('model.', '') : v
+        #                   for (k,v) in checkpoint['state_dict'].items()}
+        # vae.load_state_dict(state_dict)
+        vae = SymEmbedding.load_from_checkpoint(config['vae_chkpt'],
+                                         vae_model = vae_arch,
+                                         params = config['exp_params'])
+        task = Graphics(vae, decoder_arch, config['exp_params'])
+        loader = graphics_loader
     else:
         # TODO
         # arch = models[config['model_params']['name']](**config['model_params'])

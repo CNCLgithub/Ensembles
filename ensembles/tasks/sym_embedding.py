@@ -41,8 +41,6 @@ class SymEmbedding(pl.LightningModule):
     def validation_step(self, batch, batch_idx, optimizer_idx = 0):
         #dk, ogs = batch
         dk = batch[0]
-        print("validation step")
-        print(type(self.forward(dk)))
         results = self.forward(dk)
         val_loss = self.model.loss_function(*results,
                                             M_N = 1.0, #real_img.shape[0]/ self.num_val_imgs,
@@ -55,18 +53,6 @@ class SymEmbedding(pl.LightningModule):
 
 
        	results = results[1].unsqueeze(1)
-        vutils.save_image(results.data,
-                          os.path.join(self.logger.log_dir ,
-                                       "reconstructions",
-                                       f"recons_{self.logger.name}_Epoch_{self.current_epoch}.png"),
-                          normalize=False,
-                          nrow=6)
-        vutils.save_image(ogs.unsqueeze(1).data,
-                          os.path.join(self.logger.log_dir ,
-                                       "reconstructions",
-                                       f"gt_{self.logger.name}_Epoch_{self.current_epoch}.png"),
-                          normalize=False,
-                          nrow=6)
         #self.sample_ogs(real_img.device)
 
 
@@ -90,7 +76,7 @@ class SymEmbedding(pl.LightningModule):
                                lr=self.params['LR'],
                                weight_decay=self.params['weight_decay'])
         optims.append(optimizer)
-        if self.params['scheduler_garesultmma'] is not None:
+        if self.params['scheduler_gamma'] is not None:
             scheduler = optim.lr_scheduler.ExponentialLR(optims[0],
                                                          gamma = self.params['scheduler_gamma'])
             scheds.append(scheduler)

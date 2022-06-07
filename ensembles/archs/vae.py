@@ -52,7 +52,7 @@ class BetaVAE(BaseVAE):
 
         ogs_modules = []
 
-        hidden_dims = [16, 32, 64, 64, 64, 64]
+        hidden_dims = [16, 16, 32, 64, 64, 64, 64]
         in_channels = 1
 
         # Build Encoder
@@ -176,7 +176,7 @@ class BetaVAE(BaseVAE):
     def forward(self, dk: Tensor) -> Tensor:
         mu, log_var = self.encode(dk)
         z = self.reparameterize(mu, log_var)
-        return  [*self.decode(z), dk, mu, log_var]
+        return  [self.decode(z), dk, mu, log_var]
 
     def loss_function(self,
                       recons_dk, dk, mu, log_var,
