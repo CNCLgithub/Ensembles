@@ -10,60 +10,35 @@ from pytorch_lightning.utilities.seed import seed_everything
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.plugins import DDPPlugin
 
-from ensembles.archs.vae import BetaVAE
-from ensembles.archs.decoder import Decoder
-from ensembles.tasks.graphics import Graphics
+from ensembles.archs import BetaVAE
 from ensembles.tasks.sym_embedding import SymEmbedding
-from ensembles.dataset import object_loader, graphics_loader
+from ensembles.datasets import sym_emb_loader
 
 archs = {
     'BetaVAE' : BetaVAE,
-    'Decoder' : Decoder,
+    # 'Decoder' : Decoder,
 }
-
-def const_init(model, fill=0.0):
-    for name, param in model.named_parameters():
-        param.data.fill_(fill)
 
 def main():
     parser = argparse.ArgumentParser(description='Generic runner for VAE models')
-    parser.add_argument('config', type = str,
+    parser.add_argument('--config', type = str, default = 'sym_emb',
                         help =  'path to the config file')
 
     args = parser.parse_args()
     with open(f"/project/scripts/configs/{args.config}.yaml", 'r') as file:
         config = yaml.safe_load(file)
 
-
+    arch_name = config['arch']
     logger = CSVLogger(save_dir=config['logging_params']['save_dir'],
-                       name=config['mode'] + '_' + config['model_params']['name'],)
+                       name= f'sym-emb_{arch_name}')
 
     # For reproducibility
-    seed_everything(config['exp_params']['manual_seed'], True)
+    seed_everything(12345, True)
 
-    if config['mode'] == 'sym_embedding':
-        arch = archs[config['model_params']['name']](**config['model_params'])
-        #const_init(arch)
-        arch.train()
-        task = SymEmbedding(arch,  config['exp_params'])
-        loader = object_loader
-    elif config['mode'] == 'graphics':
-        decoder_arch = archs[config['model_params']['name']](**config['model_params'])
-        vae_arch = archs[config['vae_params']['name']](**config['vae_params'])
-        # checkpoint = torch.load(config['vae_chkpt'])
-        # state_dict = {k.replace('model.', '') : v
-        #                   for (k,v) in checkpoint['state_dict'].items()}
-        # vae.load_state_dict(state_dict)
-        vae = SymEmbedding.load_from_checkpoint(config['vae_chkpt'],
-                                         vae_model = vae_arch,
-                                         params = config['exp_params'])
-        task = Graphics(vae, decoder_arch, config['exp_params'])
-        loader = graphics_loader
-    else:
-        # TODO
-        # arch = models[config['model_params']['name']](**config['model_params'])
-        # model = OGVAE(arch,  config['exp_params'])
-        raise ValueError(f"mode {config['mode']} not recognized")
+    arch = archs[arch_name](**config['arch_params'])
+    arch.train()
+    task = SymEmbedding(arch,  **config['exp_params'])
+    loader = sym_emb_loader
 
 
     runner = Trainer(logger=logger,
@@ -75,10 +50,11 @@ def main():
                                          save_last=True),
                      ],
                      accelerator = 'auto',
-                     # strategy=DDPPlugin(find_unused_parameters=False),
                      deterministic = True,
                      **config['trainer_params'])
-    device = runner.device_ids[0]
+
+    device = runner.device_ids[0] if torch.cuda.is_available() else None
+
     train_loader = loader(config['path_params']['train_path'],
                           device,
                           **config['loader_params'])

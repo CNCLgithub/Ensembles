@@ -14,9 +14,9 @@ from ffcv.fields.decoders import NDArrayDecoder, SimpleRGBImageDecoder
 from ffcv.transforms import (Convert, NormalizeImage, ToTensor, ToTorchImage,
     ToDevice)
 
-from . pytypes import *
+from ensembles.pytypes import *
 
-class ObjectDataset(Dataset):
+class SymbolicDataset(Dataset):
     # inheriting pytorch dataset; return vector of object and gstate
     def __init__(self, src: str):
         with open(src + '_manifest.json', 'r') as f:
@@ -44,11 +44,7 @@ class ObjectDataset(Dataset):
         with open(obj_path, 'r') as f:
             obj = json.load(f)
 
-        #k = 2 (size and mass) + (4(position, velocity) * 5)
-        k = 20
-        dk_embedding = []
-        #dk_embedding[0] = obj['radius']
-        #dk_embedding[1] = obj['mass']
+        kstate = []
         for i in range(time-5,time):
             obj_path = f"{self.src}/{scene}/serialized/{i+1}_{item}.json"
             if i<0:
@@ -56,29 +52,21 @@ class ObjectDataset(Dataset):
             else:
                 with open(obj_path, 'r') as f:
                     obj_i = json.load(f)
+            kstate.append(np.asarray(obj_i['pos'])/300.0)
+            kstate.append(np.asarray(obj_i['vel'])/100.0)
 
-            dk_embedding.append(np.asarray(obj_i['pos'])/300.0)
-            dk_embedding.append(np.asarray(obj_i['vel'])/100.0)
+        kstate = np.asarray(kstate)
+        kstate = np.ndarray.flatten(kstate).astype(np.float32)
+        return kstate, gstate
 
 
-        #for loop time -5 : time, if time <0, just copy time t
-        #dk_embedding[2:4] = np.asarray(obj['pos'])/300.0
-        #dk_embedding[4:6] = np.asarray(obj['vel'])/100.0
-            #old_gstate = np.array(obj['gstate']).astype(np.float32)
-        dk_embedding = np.asarray(dk_embedding)
-        dk_embedding = np.ndarray.flatten(dk_embedding).astype(np.float32)
-        return dk_embedding, gstate
-
-    #    return dk_embedding, old_gstate, gstate
-
-def write_ffcv_data(d: ObjectDataset,
+def write_sym_data(d: SymbolicDataset,
                     path: str,
                     dk_kwargs: dict,
                     gs_kwargs: dict,
                     w_kwargs: dict) -> None:
     writer = DatasetWriter(path,
-                           {'dk': NDArrayField(**dk_kwargs),
-                           #'ogs' : NDArrayField(**gs_kwargs),
+                           {'ks': NDArrayField(**dk_kwargs),
                             'gs': NDArrayField(**gs_kwargs)},
                            **w_kwargs)
     writer.from_indexed_dataset(d)
@@ -96,14 +84,14 @@ def object_pipeline() -> List[Operation]:
             ToTensor(),
             Convert(torch.float32)]
 
-def object_loader(path: str, device,  **kwargs) -> Loader:
+def sym_loader(path: str, device,  **kwargs) -> Loader:
     with open(path + '_manifest.json', 'r') as f:
         manifest = json.load(f)
+    obj_pipe = object_pipeline()
+    if not device is None:
+        obj_pipe.append(ToDevice(device))
     l =  Loader(path + '.beton',
-                pipelines= {'dk' : object_pipeline() +
-                                      [ToDevice(device)],
-                            #'ogs' : object_pipeline() +
-                                      #[ToDevice(device)],
+                pipelines= {'ks' : obj_pipe,
                             'gs': None},
                 **kwargs)
     return l

@@ -15,7 +15,7 @@ function rep_test()
                     img_height = 128,
                     dot_repulsion= 1.,
                     outer_f=10.0)
-    rdgp = RepulsionDGP(trials = 3,
+    rdgp = RepulsionDGP(trials = 2,
                         k=60,
                         max_distance=Inf,
                         min_distance=-Inf,

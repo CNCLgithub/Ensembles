@@ -1,84 +1,58 @@
 import os
+import torch
 from torch import optim
+import torch.nn.functional as F
 import pytorch_lightning as pl
 import torchvision.utils as vutils
 from torch.utils.data import DataLoader
 
 from ensembles.pytypes import *
-from ensembles.archs.vae import BaseVAE
+from ensembles.archs import BetaVAE
 
 class SymEmbedding(pl.LightningModule):
     """Task of embedding symbolic object into z-space"""
 
     def __init__(self,
-                 vae_model: BaseVAE,
-                 params: dict) -> None:
-        super(SymEmbedding, self).__init__()
-
+                 vae_model: BetaVAE,
+                 lr:float = 1E-4,
+                 weight_decay:float = 0.0,
+                 sched_gamma:float = 0.9) -> None:
+        super().__init__()
         self.model = vae_model
-        self.params = params
-        self.curr_device = None
-        self.hold_graph = False
-        try:
-            self.hold_graph = self.params['retain_first_backpass']
-        except:
-            pass
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.sched_gamma = sched_gamma
 
     def forward(self, dk: Tensor) -> Tensor:
         return self.model(dk)
 
-    def training_step(self, batch, batch_idx, optimizer_idx = 0):
-        dk= batch[0]
-        results = self.forward(dk)
-        train_loss = self.model.loss_function(*results,
-                                              M_N = self.params['kld_weight'], #al_img.shape[0]/ self.num_train_imgs,
-                                              optimizer_idx=optimizer_idx,
-                                              batch_idx = batch_idx)
-        self.log_dict({key: val.item() for key, val in train_loss.items()}, sync_dist=True)
+    def loss_function(self,
+                      recons:Tensor, gt:Tensor,
+                      mu:Tensor, log_var:Tensor) -> dict:
+        #recons_loss =F.mse_loss(recons_dk, dk)/(dk.shape[-1]) + F.mse_loss(recons_ogs, ogs)/(ogs.shape[-1] * ogs.shape[-2])
+        recons_loss =F.mse_loss(recons, gt)
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+        loss = recons_loss + self.model.beta * kld_loss
+        return {'loss': loss, 'Reconstruction_Loss':recons_loss, 'KLD':kld_loss}
 
+    def training_step(self, batch, batch_idx, optimizer_idx = 0):
+        x = batch[0]
+        results = self.forward(x)
+        train_loss = self.loss_function(*results)
+        self.log_dict({key: val.item() for key, val in train_loss.items()}, sync_dist=True)
         return train_loss['loss']
 
     def validation_step(self, batch, batch_idx, optimizer_idx = 0):
-        #dk, ogs = batch
-        dk = batch[0]
-        results = self.forward(dk)
-        val_loss = self.model.loss_function(*results,
-                                            M_N = 1.0, #real_img.shape[0]/ self.num_val_imgs,
-                                            optimizer_idx = optimizer_idx,
-                                            batch_idx = batch_idx)
-
-
-        self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
-
-
-
-       	results = results[1].unsqueeze(1)
-        #self.sample_ogs(real_img.device)
-
-
-    # def sample_images(self, device):
-    #     samples = self.model.sample(25,
-    #                                 device)
-    #
-    #     vutils.save_image(samples.cpu().data,
-    #                     os.path.join(self.logger.log_dir ,
-    #                                     "samples",
-    #                                     f"{self.logger.name}_Epoch_{self.current_epoch}.png"),
-    #                     normalize=True,
-    #                     nrow=12)
+        x = batch[0]
+        results = self.forward(x)
+        loss = self.loss_function(*results)
+        self.log_dict({f"val_{key}": val.item() for key, val in loss.items()}, sync_dist=True)
+        return loss['loss']
 
     def configure_optimizers(self):
-
-        optims = []
-        scheds = []
-
         optimizer = optim.Adam(self.model.parameters(),
-                               lr=self.params['LR'],
-                               weight_decay=self.params['weight_decay'])
-        optims.append(optimizer)
-        if self.params['scheduler_gamma'] is not None:
-            scheduler = optim.lr_scheduler.ExponentialLR(optims[0],
-                                                         gamma = self.params['scheduler_gamma'])
-            scheds.append(scheduler)
-
-        return optims, scheds
+                               lr=self.lr,
+                               weight_decay=self.weight_decay)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer,
+                                                     gamma = self.sched_gamma)
+        return [optimizer], [scheduler]

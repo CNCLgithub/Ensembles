@@ -120,14 +120,11 @@ Returns `true` if all of the following are true:
 - none of the objects overlapreturn true
 """
 function initial_state_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)::Bool
-    # see implementation above
-    ds = distances(st.objects).- (gm.dot_radius * 2)
-
-    # TODO make sure to incorporate the radius of each object
     # we can assume that the radius is fixed
+    ds = distances(st.objects) .- (gm.dot_radius * 2)
     # objects dont overlap
-    sum(ds .<= (gm.dot_radius * 2)) === size(ds, 1)
-
+    # reads as: "only the diagonal should have distance of 0"
+    sum(ds .<= 0.) === size(ds, 1)
 end
 
 """
@@ -141,10 +138,9 @@ function step_constraint(p::RepulsionDGP, gm::RepulsionGM, st::RepulsionState)
     ds = distances(st.objects).- (gm.dot_radius * 2)
     #thresh = p.max_distance
     #get the first element that's not 0
-    (sum(ds .< ((gm.dot_radius * 2) + p.min_distance)) === size(ds, 1)) &
-        !(any(ds .> (p.max_distance + (gm.dot_radius * 2))))
+    (sum(ds .<  p.min_distance) === size(ds, 1)) &
+        !(any(ds .> p.max_distance))
     return true
-
 end
 
 

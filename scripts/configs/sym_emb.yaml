@@ -1,11 +1,9 @@
-mode: 'og_vae'
+arch: 'BetaVAE'
 
-model_params:
-  name: 'BetaVAE'
-  in_channels: 3
+arch_params:
+  sym_dim: 20
   latent_dim: 256
-  loss_type: 'H'
-  beta: 1.0
+  beta: 0.0001
 
 path_params:
   train_path: "/spaths/datasets/pilot"
@@ -16,15 +14,12 @@ loader_params:
   num_workers: 4
 
 exp_params:
-  LR: 0.0001
+  lr: 0.0001
   weight_decay: 0.0
-  scheduler_gamma: 0.9
-  kld_weight: 0.0001
-  manual_seed: 1265
+  sched_gamma: 0.9
 
 trainer_params:
   max_epochs: 10
 
 logging_params:
   save_dir: "/spaths/checkpoints"
-  manual_seed: 1265
