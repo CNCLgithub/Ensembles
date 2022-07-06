@@ -6,21 +6,28 @@ from ensembles.pytypes import *
 # based on
 # https://pytorch-lightning.readthedocs.io/en/stable/notebooks/course_UvA-DL/09-normalizing-flows.html#References
 
-def create_checkerboard_mask(n: Int, invert=False):
-    x = torch.arange(n, dtype=torch.int32)
-    mask = torch.fmod(x, 2)
-    mask = mask.to(torch.float32).view(1, n)
-    if invert:
-        mask = 1 - mask
-    return mask
+# def create_checkerboard_mask(n: Int, invert=False):
+#     x = torch.arange(n, dtype=torch.int32)
+#     mask = torch.fmod(x, 2)
+#     mask = mask.to(torch.float32).view(1, n)
+#     if invert:
+#         mask = 1 - mask
+#     return mask
 
-def create_ABAC_mask(n: Int, invert = False):
-    a_mask = torch.ones(1, n)
-    b_mask = create_checkerboard_mask(n, invert = invert)
-    return torch.cat((a_mask, b_mask), dims = 1)
+# def create_ABAC_mask(n: Int, invert = False):
+#     a_mask = torch.ones(1, n)
+#     b_mask = create_checkerboard_mask(n, invert = invert)
+#     return torch.cat((a_mask, b_mask), dims = 1)
+
+def create_mask(n:int, xstart:int, xstop:int) -> Tensor:
+    m = torch.zeros((1, n))
+    mid = int(n / 2)
+    m[:, 1:mid] = 1
+    m[:, xstart:xstop] = 1
+    return m
 
 class CouplingLayer(nn.Module):
-    def __init__(self, network, mask):
+    def __init__(self, network:nn.Module, mask:Tensor):
         """Coupling layer inside a normalizing flow.
 
         Args:
@@ -46,10 +53,7 @@ class CouplingLayer(nn.Module):
         """
         # Apply network to masked input
         z_in = z * self.mask
-        if orig_img is None:
-            nn_out = self.network(z_in)
-        else:
-            nn_out = self.network(torch.cat([z_in, orig_img], dim=1))
+        nn_out = self.network(z_in)
         s, t = nn_out.chunk(2, dim=1)
 
         # Stabilize scaling output

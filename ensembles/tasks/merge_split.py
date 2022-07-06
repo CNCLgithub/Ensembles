@@ -13,19 +13,39 @@ from ensembles.archs.vae import BaseVAE
 class MergeSplit(pl.LightningModule):
     """Task of Merge or Split over z-space"""
 
-    def __init__(self, flows, import_samples=8):
+    def __init__(self,
+                 rep_dims: int = 256,
+                 chunks: int = 8,
+                 import_samples:int =8,
+                 lr: float = 0.0001,
+                 sched_gamma: float = 0.8):
         """
         Args:
             flows: A list of flows (each a nn.Module) that should be applied on the images.
             import_samples: Number of importance samples to use during testing (see explanation below). Can be changed at any time
         """
         super().__init__()
-        self.flows = nn.ModuleList(flows)
+        self.init_flows(rep_dims, chunks)
         self.import_samples = import_samples
         # Create prior distribution for final latent space
         self.prior = torch.distributions.normal.Normal(loc=0.0, scale=1.0)
         # Example input for visualizing the graph
         self.example_input_array = train_set[0][0].unsqueeze(dim=0)
+
+    def init_flows(rep_dims:int, chunks: int) -> Nothing:
+        mask_dims = rep_dims / chunks / 2 # = 16
+        latent_dims = rep_dims / 2
+        sigma_e = FC(latent_dims, latent_dims)
+        sigma_k = FC(latent_dims, latent_dims)
+        self.flows = nn.ModuleList([])
+        for i in range(chunks):
+            x_start = i * mask_dims
+            x_stop = x_start + mask_dims
+            mask = create_mask(rep_dims, x_start, x_stop)
+            cl = CouplingLayer(sigma_e, sigma_k, mask)
+            self.flows.append(cl)
+
+        
 
     def forward(self, xs: Tensor) -> Tensor:
         # The forward function is only used for visualizing the graph
@@ -51,8 +71,7 @@ class MergeSplit(pl.LightningModule):
         """
         z, ldj = self.encode(xs)
         log_pz = self.prior.log_prob(z).sum(dim=[1, 2, 3])
-        log_px = ldj + log_pz
-        return log_px
+        return ldj + log_pz
 
     def bpd(self, xs: Tensor):
         """ Bits per dimension
